@@ -12,7 +12,7 @@ def main():
     target = Path(sys.argv[1]).expanduser().resolve()
     data_file = target / ".code-translate" / "view" / "view-data.json"
     out_file = target / ".code-translate" / "artifact.html"
-    data = data_file.read_text()
+    data = data_file.read_text().replace("�", "")
     src = (ROOT / "view-app.html").read_text()
 
     style = re.search(r"<style>.*?</style>", src, re.S).group(0)

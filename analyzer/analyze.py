@@ -355,7 +355,7 @@ def main():
         "machine_findings": findings,
         "meta": {**meta, "elapsed_s": round(time.time() - t0, 1)},
     }
-    out_file.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+    out_file.write_text(json.dumps(data, ensure_ascii=False, indent=1).replace("�", ""))
     print(f"OK: {out_file}  cards={len(data['cards'])} 未解析={len(unanalyzed)} "
           f"cost=${meta['cost_usd']} elapsed={data['meta']['elapsed_s']}s")
 
