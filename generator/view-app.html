@@ -231,7 +231,7 @@ function parseLines(spec) {
   String(spec).split(",").forEach(p => {
     const m = p.split("-").map(Number);
     const [a, b] = m.length === 2 ? m : [m[0], m[0]];
-    for (let i = a; i <= b && i - a < 200; i++) out.push(i);
+    for (let i = a; i <= b && i - a < 1200; i++) out.push(i);
   });
   return out;
 }

@@ -15,16 +15,19 @@ from pathlib import Path
 
 CODE_EXTS = {".js", ".ts", ".jsx", ".tsx", ".py", ".swift", ".rb", ".go", ".java", ".php", ".mjs"}
 CONFIG_EXTS = {".yml", ".yaml", ".env", ".toml", ".ini", ".plist", ".xml"}
-SKIP_DIRS = {".git", "node_modules", ".code-translate", "__pycache__", "dist", "build", ".venv"}
-MAX_FILE_BYTES = 60_000
-MAX_TOTAL_CHARS = 60_000
-MAX_LINES = 300
+# 台帳に載せる「コードや設定に見えるが、この版では読めないもの」。メディア・ログ・データ類は対象外(台帳にも載せない)
+NOTABLE_EXTS = {".html", ".css", ".vue", ".svelte", ".kt", ".rs", ".c", ".cpp", ".h", ".m", ".mm", ".cs", ".sql", ".sh"}
+SKIP_DIRS = {".git", "node_modules", ".code-translate", "__pycache__", "dist", "build", ".venv",
+             "DerivedData", "Intermediates.noindex", ".build", "Pods", "vendor", "coverage"}
+MAX_FILE_BYTES = 200_000
+MAX_TOTAL_CHARS = 280_000
+MAX_LINES = 1000
 
 MSGS = {
     "ja": {
         "encoding": "文字コードを読めませんでした",
         "symlink": "リンク(シンボリックリンク)のため未解析",
-        "too_long": "300行を超えるため未解析(この版の上限)",
+        "too_long": "1000行を超えるため未解析(この版の上限)",
         "web_asset": "HTML/CSS/JSON類はこの版では解析対象外",
         "gap": "(AIの分割から漏れた行)",
         "gap_prose": "この数行はAIの自動分割に含まれませんでした。右のコードを直接確認してください。",
@@ -41,7 +44,7 @@ MSGS = {
     "en": {
         "encoding": "Could not decode the file",
         "symlink": "Skipped: symbolic link",
-        "too_long": "Skipped: over 300 lines (limit of this version)",
+        "too_long": "Skipped: over 1000 lines (limit of this version)",
         "web_asset": "HTML/CSS/JSON files are not analyzed in this version",
         "gap": "(lines missed by the AI split)",
         "gap_prose": "These lines were not covered by the AI's split. Check the code on the right directly.",
@@ -98,12 +101,9 @@ def collect_files(root: Path, lang="ja"):
             unanalyzed.append({"path": rel, "reason": M["too_large"]})
         elif ext in CONFIG_EXTS:
             unanalyzed.append({"path": rel, "reason": M["config"]})
-        elif ext in {".html", ".css", ".json"}:
-            unanalyzed.append({"path": rel, "reason": M["web_asset"]})
-        elif ext in {".md", ".txt", ".lock", ".png", ".jpg", ".gitignore"} or p.name.startswith("."):
-            continue  # 文書・画像類は台帳に載せない
-        else:
+        elif ext in NOTABLE_EXTS:
             unanalyzed.append({"path": rel, "reason": M["unsupported"]})
+        # メディア・ログ・データ・文書類はレビュー対象外(台帳にも載せない)
     return analyzed, unanalyzed
 
 
@@ -158,7 +158,7 @@ def compute_seal(files, git):
     return {"kind": "hash", "commit": None, "hash": digest, "dirty": False}
 
 
-def numbered(text, limit=300):
+def numbered(text, limit=MAX_LINES):
     lines = text.splitlines()[:limit]
     return "\n".join(f"{i}: {l}" for i, l in enumerate(lines, 1))
 
@@ -289,11 +289,12 @@ def main():
         except Exception:
             prev = None
     if prev and not args.force and prev.get("seal", {}).get("hash") == seal["hash"] and prev.get("lang") == args.lang:
-        if prev.get("seal") != seal:
+        if prev.get("seal") != seal or prev.get("unanalyzed") != unanalyzed:
             prev["seal"] = seal
+            prev["unanalyzed"] = unanalyzed
             prev["generated_at"] = datetime.now(timezone.utc).isoformat()
             out_file.write_text(json.dumps(prev, ensure_ascii=False, indent=1))
-            print("コードは変更なし。封印情報のみ更新しました。")
+            print("コードは変更なし。封印・台帳情報のみ更新しました。")
         else:
             print("変更なし(封印一致)。再翻訳をスキップしました。")
         return
@@ -344,7 +345,7 @@ def main():
                 "path": f["path"],
                 "role": ai.get("file_roles", {}).get(f["path"], ""),
                 "author": git["authors"].get(f["path"], ""),
-                "lines": f["text"].splitlines()[:300],
+                "lines": f["text"].splitlines()[:MAX_LINES],
             }
             for f in analyzed
         ],
