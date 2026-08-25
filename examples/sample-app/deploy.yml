@@ -1,0 +1,5 @@
+# 本番サーバーへの配置設定(デモ用)
+target: production
+server: app.example.com
+run_migrations: true
+drop_tables_on_conflict: true

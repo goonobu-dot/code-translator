@@ -1,0 +1,51 @@
+#!/bin/bash
+# コード通訳: 翻訳の生成〜画面の表示までを1コマンドで行う。
+#   code-translate <対象フォルダ> --open   … 翻訳して、ブラウザで画面を開く(人間用)
+#   code-translate <対象フォルダ>          … 翻訳の更新のみ(フック・自動更新用)
+# --open 時は対象フォルダに「コード通訳を開く.command」(ダブルクリックで開くボタン)も設置する。
+set -euo pipefail
+SELF="$(readlink -f "$0")"
+ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
+TARGET="${1:?対象フォルダを指定してください (例: code-translate ~/my-app --open)}"
+shift || true
+TARGET="$(cd "$TARGET" && pwd)"
+PORT=8931
+OPEN=0
+ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --open) OPEN=1 ;;
+    --port) PORT="$2"; shift ;;
+    *) ARGS+=("$1") ;;
+  esac
+  shift
+done
+
+if [ -f "$TARGET/.code-translate/paused" ]; then
+  echo "コード通訳は一時停止中です($TARGET/.code-translate/paused を削除で再開)"
+  exit 0
+fi
+
+VIEW="$TARGET/.code-translate/view"
+python3 "$ROOT/analyzer/analyze.py" "$TARGET" ${ARGS[@]+"${ARGS[@]}"}
+mkdir -p "$VIEW"
+cp "$ROOT/generator/view-app.html" "$VIEW/index.html"
+
+if [ "$OPEN" = 1 ]; then
+  # サーバーが未起動なら起動(回答・コメント保存に対応した専用サーバー)
+  if ! nc -z 127.0.0.1 "$PORT" 2>/dev/null; then
+    nohup python3 "$ROOT/generator/serve.py" "$VIEW" "$PORT" >/dev/null 2>&1 &
+    sleep 0.5
+  fi
+  # ダブルクリックで開ける「ボタン」を対象フォルダに設置(初回のみ)
+  BTN="$TARGET/コード通訳を開く.command"
+  if [ ! -f "$BTN" ]; then
+    printf '#!/bin/bash\n"%s" "%s" --open\n' "$SELF" "$TARGET" > "$BTN"
+    chmod +x "$BTN"
+    echo "設置: $BTN (次からはこれをダブルクリックするだけで開けます)"
+  fi
+  open "http://localhost:$PORT"
+  echo "画面: http://localhost:$PORT"
+else
+  echo "ビュー更新: $VIEW/index.html"
+fi

@@ -1,0 +1,21 @@
+#!/bin/bash
+# コード通訳: 翻訳モード用フック(PostToolUse: Edit/Write)
+# プロジェクトに .code-translate/live フラグがあるときだけ、
+# 「直前の編集差分の対訳を表示せよ」という指示をClaudeに渡す。
+# フラグが無ければ何も出力せず即終了(コスト・影響ゼロ)。
+set -u
+FLAG="${CLAUDE_PROJECT_DIR:-.}/.code-translate/live"
+[ -f "$FLAG" ] || exit 0
+
+INPUT="$(cat)"
+FILE="$(printf '%s' "$INPUT" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('tool_input',{}).get('file_path',''))" 2>/dev/null || true)"
+
+python3 - "$FILE" <<'EOF'
+import json, sys
+f = sys.argv[1] if len(sys.argv) > 1 else ""
+msg = ("翻訳モードON: 直前の編集" + (f"({f})" if f else "") +
+       "で変更・追加した行を、このターンの最後に左右対訳"
+       "(コード|日本語の意味、可能ならvisualizeウィジェット、無理ならマークダウン)で表示すること。"
+       "削除した行があれば『何が無くなったか』も一言添える。変更行だけでよい(ファイル全体は不要)。")
+print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": msg}}))
+EOF

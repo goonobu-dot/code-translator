@@ -1,0 +1,7 @@
+.DS_Store
+node_modules/
+.code-translate/
+コード通訳を開く.command
+assets/
+demo/
+docs/manual.html

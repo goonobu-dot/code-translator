@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コード通訳</title>
+<style>
+  :root {
+    --bg:#F7F8F7; --surface:#FFF; --ink:#242B2E; --muted:#67736F; --line:#E2E5E0;
+    --accent:#0E7C66; --soft:#F2F4F1;
+    --ok-bg:#E7F2EE; --ok-fg:#085041; --warn-bg:#FBF3E1; --warn-fg:#633806;
+    --crit-bg:#FBEAE8; --crit-fg:#791F1F;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#14181A; --surface:#1D2326; --ink:#E4E8E4; --muted:#96A29E; --line:#2C3538;
+    --accent:#3FB392; --soft:#252C2F;
+    --ok-bg:#1C2E29; --ok-fg:#7DD3B9; --warn-bg:#2E2718; --warn-fg:#E0B45E;
+    --crit-bg:#331E1C; --crit-fg:#E88B81;
+  } }
+  :root[data-theme="dark"] {
+    --bg:#14181A; --surface:#1D2326; --ink:#E4E8E4; --muted:#96A29E; --line:#2C3538;
+    --accent:#3FB392; --soft:#252C2F;
+    --ok-bg:#1C2E29; --ok-fg:#7DD3B9; --warn-bg:#2E2718; --warn-fg:#E0B45E;
+    --crit-bg:#331E1C; --crit-fg:#E88B81;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; font-size:14px; line-height:1.8; }
+  header { position:sticky; top:0; z-index:5; background:var(--surface); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  header .title { font-weight:700; }
+  .badge { font-size:12px; padding:2px 10px; border-radius:999px; white-space:nowrap; }
+  .b-ok { background:var(--ok-bg); color:var(--ok-fg); }
+  .b-warn { background:var(--warn-bg); color:var(--warn-fg); }
+  .b-crit { background:var(--crit-bg); color:var(--crit-fg); }
+  .hbtn { border:1px solid var(--line); border-radius:8px; background:var(--surface); padding:5px 12px; font-size:12.5px; cursor:pointer; color:var(--muted); font-family:inherit; }
+  .hbtn.on { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+  main { padding:12px 16px 80px; max-width:940px; margin:0 auto; }
+  .filebar { display:flex; gap:6px; padding:10px 16px 0; flex-wrap:wrap; align-items:center; max-width:940px; margin:0 auto; }
+  .filebar .lbl { font-size:12px; color:var(--muted); }
+  .fbtn { font-family:Menlo,monospace; font-size:12.5px; padding:6px 14px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
+  .fbtn.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .fbtn .fd { font-family:"Hiragino Kaku Gothic ProN",sans-serif; font-size:11px; margin-left:6px; }
+  .fbtn .fd.ok { color:var(--ok-fg); } .fbtn.on .fd.ok { color:inherit; }
+  .fbtn .fd.warn { color:var(--warn-fg); } .fbtn.on .fd.warn { color:inherit; }
+  .summary { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px; }
+  .summary .lb { font-size:11px; font-weight:700; color:var(--accent); letter-spacing:.08em; }
+  .guide { background:var(--surface); border:2px solid var(--accent); border-radius:12px; padding:12px 16px; margin-bottom:12px; font-size:13.5px; }
+  .guide b { font-size:14.5px; }
+  .gbtn { font-family:inherit; font-size:12.5px; padding:5px 14px; border-radius:8px; border:none; background:var(--accent); color:var(--bg); cursor:pointer; margin-top:6px; }
+  .filehead { font-size:14.5px; font-weight:700; margin:22px 0 8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .filehead .role { font-weight:400; color:var(--muted); font-size:13px; }
+  .achip { font-size:10.5px; font-weight:400; background:var(--soft); color:var(--muted); padding:1px 8px; border-radius:999px; }
+  .sec { display:grid; grid-template-columns:minmax(0,24rem) minmax(0,1fr); border:1px solid var(--line); border-radius:12px; margin-bottom:10px; overflow:hidden; background:var(--surface); }
+  .sec.imp { border-color:var(--warn-fg); }
+  .sec.done-ok { border-color:var(--ok-fg); }
+  .sec.done-ng { border-color:var(--crit-fg); }
+  .sec-l { padding:12px 16px 12px; display:flex; flex-direction:column; }
+  .sec-h { font-weight:700; font-size:15px; line-height:1.6; margin-bottom:4px; }
+  .impb { font-size:11px; font-weight:700; color:var(--warn-fg); background:var(--warn-bg); border-radius:999px; padding:1px 8px; margin-right:6px; white-space:nowrap; }
+  .sec-p { font-size:15px; line-height:1.8; }
+  .sec-warn { font-size:13px; color:var(--warn-fg); background:var(--warn-bg); border-radius:8px; padding:7px 12px; margin-top:8px; line-height:1.7; }
+  .sec-a { font-size:11.5px; color:var(--muted); font-family:Menlo,monospace; margin-top:6px; }
+  .sec-r { background:#1F2428; color:#D6DEE3; padding:10px 0; overflow-x:auto; font-family:Menlo,monospace; font-size:12px; line-height:1.75; }
+  .ln { display:flex; padding:0 14px; white-space:pre; }
+  .ln .no { width:32px; color:#5C666D; flex-shrink:0; user-select:none; }
+  .kw { border-bottom:1px dotted #7BA8C4; cursor:help; }
+  .c-com { color:#8A99A3; } .c-str { color:#E8B36A; } .c-key { color:#8FBFE8; }
+  .ctrl { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .ctrl button { font-family:inherit; font-size:13px; padding:6px 14px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
+  .ctrl .ok { border-color:var(--ok-fg); color:var(--ok-fg); }
+  .ctrl .ng { border-color:var(--crit-fg); color:var(--crit-fg); }
+  .ctrl .ok.sel { background:var(--ok-fg); color:var(--surface); }
+  .ctrl .ng.sel { background:var(--crit-fg); color:var(--surface); }
+  .ctrl .uk.sel { background:var(--muted); color:var(--surface); border-color:var(--muted); }
+  .ctrl .undo { font-size:11.5px; color:var(--muted); border:none; text-decoration:underline; background:none; }
+  .cwrap { margin-top:8px; }
+  .cwrap summary { font-size:12px; color:var(--muted); cursor:pointer; }
+  .cwrap textarea { width:100%; min-height:56px; margin-top:6px; font-family:inherit; font-size:13px; line-height:1.6; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); resize:vertical; }
+  .cwrap .saved { font-size:11px; color:var(--ok-fg); margin-left:6px; }
+  .comment-view { font-size:13px; background:var(--soft); border-radius:8px; padding:7px 12px; margin-top:8px; }
+  .comment-view .cl { font-size:11px; font-weight:700; color:var(--muted); }
+  .sec.veiled { cursor:pointer; }
+  .sec.veiled .sec-h, .sec.veiled .sec-p, .sec.veiled .ctrl, .sec.veiled .cwrap, .sec.veiled .comment-view { display:none; }
+  .sec.veiled .sec-l::before { content:"❓ この数行は何をしている? — まず右のコードを読んで予想 → ここをクリックで答え"; color:var(--muted); font-size:13px; display:block; line-height:1.7; }
+  .verdict { border-radius:12px; padding:14px 18px; font-size:14px; margin-top:20px; }
+  .verdict.locked { background:var(--crit-bg); color:var(--crit-fg); }
+  .verdict.open { background:var(--ok-bg); color:var(--ok-fg); }
+  .verdict ul { margin:6px 0 0; padding-left:1.4em; }
+  .findings { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 16px; font-size:12.5px; margin-top:10px; }
+  .findings li { margin-bottom:3px; }
+  .sev { font-size:10.5px; font-weight:700; padding:0 6px; border-radius:4px; margin-right:4px; background:var(--warn-bg); color:var(--warn-fg); }
+  .sev-critical { background:var(--crit-bg); color:var(--crit-fg); }
+  .warp { position:fixed; bottom:16px; right:16px; z-index:6; font-family:inherit; font-size:12.5px; padding:8px 16px; border-radius:999px; border:1px solid var(--warn-fg); background:var(--warn-bg); color:var(--warn-fg); cursor:pointer; }
+  #toast { position:fixed; bottom:16px; left:16px; background:var(--ink); color:var(--bg); padding:8px 16px; border-radius:8px; font-size:12.5px; opacity:0; transition:opacity .3s; pointer-events:none; }
+  .note { font-size:12px; color:var(--muted); margin-top:14px; }
+  @media (max-width:700px) { .sec { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="title">📖 コード通訳</span>
+  <span class="badge b-warn" id="bProg"></span>
+  <span class="badge b-warn" id="bCover"></span>
+  <button class="hbtn" id="tVeil"></button>
+  <button class="hbtn" id="tTheme" title="配色の切替"></button>
+</header>
+<div class="filebar" id="filebar"></div>
+<main id="main"></main>
+<div id="toast"></div>
+<script>
+const KW = {
+  "function":"「処理のまとまり」を作る合図", "const":"名前をつけて値を保管する箱", "let":"あとで中身を変えられる箱",
+  "if":"もし〜なら", "else":"そうでなければ", "return":"この手順をここで終える合図",
+  "await":"結果を待ってから次へ進む", "async":"待ち時間のある処理の目印", "require":"別のファイルの機能を読み込む",
+  "for":"繰り返し処理", "while":"条件が続く間繰り返す", "try":"失敗するかもしれない処理を試す",
+  "catch":"失敗したときの受け皿", "throw":"エラーを発生させて知らせる", "new":"新しいものを作る",
+  "process":"アプリの実行環境(環境変数など)",
+};
+const THEMES = [["auto","配色: 自動"],["light","配色: ライト"],["dark","配色: ダーク"]];
+let DATA = null, REVIEW = {}, generatedAt = null, canPost = true, activeFile = "__all__";
+let VEIL = localStorage.getItem("ct-veil") === "1";
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const secKey = s => s.file + "|" + s.lines + "|" + s.heading;
+const cur = () => { const k = DATA.seal.hash; if (!REVIEW[k]) REVIEW[k] = {}; return REVIEW[k]; };
+
+function applyTheme() {
+  const t = localStorage.getItem("ct-theme") || "auto";
+  if (t === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t;
+  $("tTheme").textContent = (THEMES.find(x => x[0] === t) || THEMES[0])[1];
+}
+$("tTheme").onclick = () => {
+  const c = localStorage.getItem("ct-theme") || "auto";
+  localStorage.setItem("ct-theme", THEMES[(THEMES.findIndex(x => x[0] === c) + 1) % THEMES.length][0]);
+  applyTheme();
+};
+$("tVeil").onclick = () => { VEIL = !VEIL; localStorage.setItem("ct-veil", VEIL ? "1" : "0"); render(); };
+
+async function saveReview() {
+  localStorage.setItem("ct-review", JSON.stringify(REVIEW));
+  if (!canPost) return;
+  try {
+    const r = await fetch("/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(REVIEW) });
+    if (!r.ok) throw 0;
+  } catch { canPost = false; toast("この画面では回答はこの端末にのみ保存されます"); }
+}
+function parseLines(spec) {
+  const out = [];
+  String(spec).split(",").forEach(p => {
+    const m = p.split("-").map(Number);
+    const [a, b] = m.length === 2 ? m : [m[0], m[0]];
+    for (let i = a; i <= b && i - a < 200; i++) out.push(i);
+  });
+  return out;
+}
+function hlLine(raw) {
+  let s = esc(raw), comment = "";
+  const ci = s.indexOf("//");
+  if (ci >= 0) { comment = `<span class="c-com">${s.slice(ci)}</span>`; s = s.slice(0, ci); }
+  s = s.replace(/(&quot;[^&]*?&quot;|'[^']*'|`[^`]*`)/g, '<span class="c-str">$1</span>');
+  s = s.replace(/\b(function|const|let|var|if|else|return|await|async|require|for|while|try|catch|throw|new|process)\b/g,
+    m => KW[m] ? `<span class="c-key kw" title="${m} = ${KW[m]}">${m}</span>` : `<span class="c-key">${m}</span>`);
+  return (s + comment) || " ";
+}
+
+function render() {
+  if (!DATA) return;
+  const d = DATA, rv = cur();
+  const secs = d.sections || [];
+  const answered = secs.filter(s => (rv[secKey(s)] || {}).v).length;
+  const ngs = secs.filter(s => (rv[secKey(s)] || {}).v === "ng").length;
+  const uks = secs.filter(s => (rv[secKey(s)] || {}).v === "uk").length;
+  const comments = secs.filter(s => (rv[secKey(s)] || {}).comment).length;
+  const crit = d.machine_findings.filter(f => f.severity === "critical").length;
+  const remain = secs.length - answered;
+
+  $("bProg").textContent = remain ? `残り ${remain}個` : (ngs || uks) ? "回答済み(要対応あり)" : "全部確認ずみ ✓";
+  $("bProg").className = "badge " + (remain ? "b-warn" : (ngs || uks) ? "b-crit" : "b-ok");
+  $("bCover").textContent = `読めた範囲 ${d.files.length}/${d.files.length + d.unanalyzed.length}`;
+  $("bCover").className = "badge " + (d.unanalyzed.length ? "b-warn" : "b-ok");
+  $("tVeil").textContent = VEIL ? "学習中(答えを隠す)" : "学習モード";
+  $("tVeil").className = "hbtn" + (VEIL ? " on" : "");
+
+  const fb = ['<span class="lbl">見たいコードを押す:</span>'];
+  fb.push(`<button class="fbtn${activeFile === "__all__" ? " on" : ""}" onclick="setFile('__all__')">すべて</button>`);
+  for (const f of d.files) {
+    const fsecs = secs.filter(s => s.file === f.path);
+    const rem = fsecs.filter(s => !(rv[secKey(s)] || {}).v).length;
+    fb.push(`<button class="fbtn${activeFile === f.path ? " on" : ""}" onclick="setFile('${esc(f.path)}')">${esc(f.path)}<span class="fd ${rem ? "warn" : "ok"}">${rem ? "残り" + rem : "✓"}</span></button>`);
+  }
+  $("filebar").innerHTML = fb.join("");
+
+  let h = "";
+  if (!localStorage.getItem("ct-guide-hide")) {
+    h += `<div class="guide"><b>使い方は2つだけ</b><br>
+      ① 上の<b>ファイル名のボタンを押す</b>と、そのコードが翻訳つきで表示されます(翻訳はもう終わっています)。<br>
+      ② 各まとまりの説明を読んで、<b>「✓ 問題ない / ✗ おかしい / ? わからない」のどれかを押す</b>。気になることは「コメントを書く」にどうぞ。
+      「✗」やコメントは、チャットで「たまった指摘を直して」と言えばAIがまとめて対応します。<br>
+      <button class="gbtn" onclick="hideGuide()">わかった(閉じる)</button></div>`;
+  }
+  h += `<div class="summary"><span class="lb">このシステムは何をするものか</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
+
+  let impCount = 0;
+  for (const f of d.files) {
+    if (activeFile !== "__all__" && f.path !== activeFile) continue;
+    const fsecs = secs.filter(s => s.file === f.path);
+    if (!fsecs.length) continue;
+    const ltMap = {};
+    d.line_translations.filter(t => t.file === f.path).forEach(t => ltMap[t.line] = t);
+    h += `<div class="filehead">${esc(f.path)}<span class="role">${f.role ? "— " + esc(f.role) : ""}</span>${f.author ? `<span class="achip">書き手: ${esc(f.author)}</span>` : ""}</div>`;
+    for (const s of fsecs) {
+      const k = secKey(s), st = rv[k] || {};
+      const lines = parseLines(s.lines);
+      const secCards = d.cards.filter(c => c.file === f.path && parseLines(c.lines).some(n => lines.includes(n)));
+      const imp = secCards.length > 0;
+      if (imp) impCount++;
+      const veiled = VEIL && !imp && !st.v;
+      let code = "";
+      for (const n of lines) {
+        if (n > f.lines.length) break;
+        const t = ltMap[n];
+        code += `<div class="ln"${t ? ` title="${esc(t.translation)}"` : ""}><span class="no">${n}</span><span>${hlLine(f.lines[n - 1] || "")}</span></div>`;
+      }
+      const border = st.v === "ok" ? " done-ok" : (st.v === "ng" || st.v === "uk") ? " done-ng" : "";
+      h += `<div class="sec${imp ? " imp" : ""}${border}${veiled ? " veiled" : ""}" id="sec-${esc(k).replace(/[^a-zA-Z0-9]/g, "_")}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
+        <div class="sec-l">
+          <div class="sec-h">${imp ? `<span class="impb">⚠ 注意</span>` : ""}${esc(s.heading)}</div>
+          <div class="sec-p">${esc(s.prose)}</div>
+          ${secCards.map(c => `<div class="sec-warn">⚠ ${esc(c.title)} — ${esc(c.body)}</div>`).join("")}
+          <div class="sec-a">${esc(s.lines)}行目</div>
+          <div class="ctrl">${st.v
+            ? `<span style="font-size:13px">${st.v === "ok" ? "✓ 問題ないと回答済み" : st.v === "ng" ? "✗ おかしいと回答済み(チャットで「たまった指摘を直して」)" : "? わからないと回答済み(チャットで聞けば説明します)"}</span><button class="undo" onclick="ans(event,'${esc(k)}',null)">取り消す</button>`
+            : `<button class="ok" onclick="ans(event,'${esc(k)}','ok')">✓ 問題ない</button>
+               <button class="ng" onclick="ans(event,'${esc(k)}','ng')">✗ おかしい</button>
+               <button class="uk" onclick="ans(event,'${esc(k)}','uk')">? わからない</button>`}</div>
+          ${st.comment
+            ? `<div class="comment-view"><span class="cl">あなたのコメント</span><br>${esc(st.comment)} <button class="undo" style="font-size:11px" onclick="editComment(event,'${esc(k)}')">編集</button></div>`
+            : `<details class="cwrap" onclick="event.stopPropagation()"><summary>コメントを書く</summary>
+               <textarea id="ta-${esc(k).replace(/[^a-zA-Z0-9]/g, "_")}" placeholder="例: ここは確認画面を挟んでほしい"></textarea>
+               <button class="hbtn" onclick="saveComment(event,'${esc(k)}')">保存</button></details>`}
+        </div>
+        <div class="sec-r">${code}</div></div>`;
+    }
+  }
+
+  if (d.unanalyzed.length) {
+    h += `<h3 style="font-size:13px;color:var(--muted)">まだ読めていないファイル</h3><div class="findings"><ul>` +
+      d.unanalyzed.map(u => `<li><span class="sev">未読</span>${esc(u.path)} — ${esc(u.reason)}</li>`).join("") + `</ul></div>`;
+  }
+
+  const ok = remain === 0 && ngs === 0 && uks === 0 && d.unanalyzed.length === 0 && crit === 0 && !d.seal.dirty;
+  h += `<div class="verdict ${ok ? "open" : "locked"}">${ok ? "✅ <b>全部確認できました。</b>すべてのまとまりに「問題ない」と回答済みで、重大な問題は見つかっていません。" : "🔒 <b>まだ確認は終わっていません。</b>"}<ul>`
+    + (remain ? `<li>読んでいないまとまりが ${remain}個</li>` : "")
+    + (ngs ? `<li>「✗ おかしい」が ${ngs}件(チャットで「たまった指摘を直して」)</li>` : "")
+    + (uks ? `<li>「? わからない」が ${uks}件(チャットで聞けば説明します)</li>` : "")
+    + (d.unanalyzed.length ? `<li>まだ読めていないファイルが ${d.unanalyzed.length}件</li>` : "")
+    + (crit ? `<li>重大な問題(キーの置き忘れ等)が ${crit}件</li>` : "")
+    + (d.seal.dirty ? `<li>保存(コミット)されていない変更があります</li>` : "")
+    + `</ul></div>`;
+  if (d.machine_findings.length) {
+    h += `<details class="findings"><summary style="cursor:pointer">自動チェックの記録(参考・${d.machine_findings.length}件)</summary><ul style="margin-top:6px">` +
+      d.machine_findings.map(f => `<li><span class="sev sev-${f.severity === "critical" ? "critical" : ""}">${f.severity}</span>${esc(f.file)}:${f.line} — ${esc(f.note)}</li>`).join("") + `</ul></details>`;
+  }
+  h += `<p class="note">生成: ${new Date(d.generated_at).toLocaleString("ja-JP")} / コードが変わると画面と回答は自動で新しい版に切り替わります。コードの行にマウスを乗せると1行ずつの訳が出ます。${comments ? ` / コメント ${comments}件` : ""}</p>`;
+  if (impCount) h += `<button class="warp" onclick="nextImp()">⚠ 次の注意箇所へ (${impCount})</button>`;
+  $("main").innerHTML = h;
+}
+function ans(ev, k, v) {
+  ev.stopPropagation();
+  const rv = cur();
+  if (!rv[k]) rv[k] = {};
+  if (v) { rv[k].v = v; rv[k].t = Date.now(); } else { delete rv[k].v; }
+  if (!rv[k].v && !rv[k].comment) delete rv[k];
+  saveReview(); render();
+}
+function saveComment(ev, k) {
+  ev.stopPropagation(); ev.preventDefault();
+  const ta = $("ta-" + k.replace(/[^a-zA-Z0-9]/g, "_"));
+  if (!ta || !ta.value.trim()) return;
+  const rv = cur();
+  if (!rv[k]) rv[k] = {};
+  rv[k].comment = ta.value.trim(); rv[k].ct = Date.now();
+  saveReview(); render();
+}
+function editComment(ev, k) {
+  ev.stopPropagation();
+  const rv = cur(), old = (rv[k] || {}).comment || "";
+  delete rv[k].comment;
+  render();
+  const ta = $("ta-" + k.replace(/[^a-zA-Z0-9]/g, "_"));
+  if (ta) { ta.closest("details").open = true; ta.value = old; ta.focus(); }
+}
+function revealSec(ev, el) { ev.stopPropagation(); el.classList.remove("veiled"); el.removeAttribute("onclick"); }
+function hideGuide() { localStorage.setItem("ct-guide-hide", "1"); render(); }
+function setFile(p) { activeFile = p; impIdx = -1; render(); window.scrollTo({ top: 0 }); }
+let impIdx = -1;
+function nextImp() {
+  const imps = document.querySelectorAll(".sec.imp");
+  if (!imps.length) return;
+  impIdx = (impIdx + 1) % imps.length;
+  imps[impIdx].scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 3000); }
+
+async function load(first) {
+  if (window.EMBEDDED_DATA) {
+    if (!DATA) {
+      DATA = window.EMBEDDED_DATA;
+      canPost = false;
+      try { REVIEW = JSON.parse(localStorage.getItem("ct-review")) || {}; } catch { REVIEW = {}; }
+      document.title = "コード通訳 — " + DATA.project_name;
+      render();
+    }
+    return;
+  }
+  try {
+    const r = await fetch("view-data.json?ts=" + Date.now());
+    const d = await r.json();
+    if (d.generated_at !== generatedAt) {
+      generatedAt = d.generated_at;
+      DATA = d;
+      try { REVIEW = await (await fetch("review.json?ts=" + Date.now())).json(); }
+      catch { try { REVIEW = JSON.parse(localStorage.getItem("ct-review")) || {}; } catch { REVIEW = {}; } }
+      document.title = "コード通訳 — " + d.project_name;
+      render();
+      if (!first) toast("翻訳が更新されました");
+    }
+  } catch {
+    if (first) $("main").innerHTML = `<p style="color:var(--crit-fg);padding:16px">まだ翻訳データがありません。チャットで「コードを翻訳して」と言ってください。</p>`;
+  }
+}
+applyTheme();
+load(true);
+setInterval(() => load(false), 4000);
+</script>
+</body>
+</html>
