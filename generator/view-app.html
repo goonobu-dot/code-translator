@@ -51,13 +51,16 @@
   .pairsfile { border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:20px; background:var(--surface); }
   .sec { display:grid; grid-template-columns:minmax(0,26rem) minmax(0,1fr); }
   .sec + .sec .sec-l { border-top:1px solid var(--line); }
-  .sec + .sec .sec-r { border-top:1px solid #2A3238; }
+  .sec:hover .sec-r { background:#262E34; }
+  .sec.flash .sec-r { background:#2B3440; }
   .sec.imp .sec-l { box-shadow:inset 3px 0 0 var(--warn-fg); }
   .sec.done-ok .sec-l { box-shadow:inset 3px 0 0 var(--ok-fg); }
   .sec.done-ng .sec-l { box-shadow:inset 3px 0 0 var(--crit-fg); }
   .sec-l { padding:9px 14px 9px; display:flex; flex-direction:column; }
   .sec-h { font-weight:700; font-size:13.5px; line-height:1.6; margin-bottom:2px; display:flex; align-items:baseline; gap:8px; }
   .sec-h .sec-a { margin:0 0 0 auto; font-weight:400; }
+  .crumb { font-size:10.5px; color:var(--muted); font-family:Menlo,monospace; margin-bottom:3px; }
+  .crumb .cn { border-bottom:1px dashed var(--line); cursor:pointer; }
   .impb { font-size:10px; font-weight:700; color:var(--warn-fg); background:var(--warn-bg); border-radius:999px; padding:0 7px; white-space:nowrap; }
   .sec-p { font-size:13.5px; line-height:1.75; color:var(--ink); }
   .sec-warn { font-size:12px; color:var(--warn-fg); background:var(--warn-bg); border-radius:6px; padding:4px 10px; margin-top:6px; line-height:1.65; }
@@ -165,6 +168,7 @@ const UI = {
     stOk: "✓ 確認済み", stNg: "✗ 要修正", stUk: "? 保留",
     flowLb: "何が起きるか(押すとそのコードへ)",
     storyBtn: "▶ 順番に読む", storyPrev: "← 前へ", storyNext: "次へ →", storyDone: "おわり",
+    crumbIn: "の中",
     guideShort: "使い方: 上のファイル名を押す → 説明を読む → ✓ / ✗ / ? を押す。✗とコメントはチャットで「たまった指摘を直して」と言えばAIが対応。",
     cmtOpen: "コメントを書く", cmtPh: "例: ここは確認画面を挟んでほしい", save: "保存",
     yourCmt: "あなたのコメント", edit: "編集",
@@ -194,6 +198,7 @@ const UI = {
     stOk: "✓ Reviewed", stNg: "✗ Flagged", stUk: "? On hold",
     flowLb: "What happens (click to jump to the code)",
     storyBtn: "▶ Read in order", storyPrev: "← Back", storyNext: "Next →", storyDone: "Done",
+    crumbIn: "— inside this",
     guideShort: 'How to: press a file name above → read each unit → press ✓ / ✗ / ?. ✗ answers and comments are fixed when you say "fix the flagged items" in chat.',
     cmtOpen: "Write a comment", cmtPh: "e.g. add a confirmation screen before sending", save: "Save",
     yourCmt: "Your comment", edit: "Edit",
@@ -259,6 +264,26 @@ function jumpToLine(file, line) {
 function jumpRef(name) {
   const d = DEFS[name];
   if (d) jumpToLine(d.file, d.line);
+}
+function scopeChain(f, startLine) {
+  // この数行を包んでいる関数・クラス名を、インデントを頼りに外側へたどる(最大2階層)
+  const lines = f.lines || [];
+  let idx = startLine - 1;
+  while (idx < lines.length && !(lines[idx] || "").trim()) idx++;
+  const indentOf = s => ((s || "").match(/^\s*/) || [""])[0].length;
+  let cur = indentOf(lines[idx] || "");
+  const chain = [];
+  for (let j = idx - 1; j >= 0 && chain.length < 2 && cur > 0; j--) {
+    const ln = lines[j] || "";
+    if (!ln.trim()) continue;
+    const ind = indentOf(ln);
+    if (ind < cur) {
+      const m = ln.match(DEF_RE);
+      if (m && m[1]) chain.unshift(m[1]);
+      cur = ind;
+    }
+  }
+  return chain;
 }
 function jumpFlow(i) {
   const st = (DATA.flow || [])[i];
@@ -401,6 +426,10 @@ function render() {
       h += `<div class="sec${imp ? " imp" : ""}${border}${veiled ? " veiled" : ""}" id="s${ki}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
         <div class="sec-l">
           <div class="sec-h">${imp ? `<span class="impb">${L.caution}</span>` : ""}${esc(s.heading)}<span class="sec-a">${L.lines(esc(String(s.lines)))}</span></div>
+          ${(() => {
+            const ch = scopeChain(f, lines[0]);
+            return ch.length ? `<div class="crumb">📦 ${ch.map(n => `<span class="cn" onclick="event.stopPropagation();jumpRef('${n}')">${esc(n)}</span>`).join(" › ")} ${L.crumbIn}</div>` : "";
+          })()}
           <div class="sec-p">${esc(s.prose)}</div>
           ${secCards.map(c => `<div class="sec-warn">⚠ ${esc(c.title)} — ${esc(c.body)}</div>`).join("")}
           <div class="ctrl">${st.v
