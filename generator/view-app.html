@@ -24,31 +24,30 @@
     --crit-bg:#331E1C; --crit-fg:#E88B81;
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; font-size:14px; line-height:1.8; }
-  header { position:sticky; top:0; z-index:5; background:var(--surface); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  header .title { font-weight:700; }
-  .badge { font-size:12px; padding:2px 10px; border-radius:999px; white-space:nowrap; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; font-size:13.5px; line-height:1.7; }
+  header { position:sticky; top:0; z-index:5; background:var(--surface); border-bottom:1px solid var(--line); padding:7px 14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  header .title { font-weight:700; font-size:13.5px; }
+  .badge { font-size:11px; padding:1px 8px; border-radius:999px; white-space:nowrap; }
   .b-ok { background:var(--ok-bg); color:var(--ok-fg); }
   .b-warn { background:var(--warn-bg); color:var(--warn-fg); }
   .b-crit { background:var(--crit-bg); color:var(--crit-fg); }
-  .hbtn { border:1px solid var(--line); border-radius:8px; background:var(--surface); padding:5px 12px; font-size:12.5px; cursor:pointer; color:var(--muted); font-family:inherit; }
+  .hbtn { border:1px solid var(--line); border-radius:8px; background:var(--surface); padding:2px 10px; font-size:11.5px; cursor:pointer; color:var(--muted); font-family:inherit; }
   .hbtn.on { background:var(--accent); color:var(--bg); border-color:var(--accent); }
   main { padding:12px 16px 80px; max-width:940px; margin:0 auto; }
-  .filebar { display:flex; gap:6px; padding:10px 16px 0; flex-wrap:wrap; align-items:center; max-width:940px; margin:0 auto; }
-  .filebar .lbl { font-size:12px; color:var(--muted); }
-  .fbtn { font-family:Menlo,monospace; font-size:12.5px; padding:6px 14px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
+  .filebar { display:flex; gap:5px; padding:8px 16px 0; flex-wrap:wrap; align-items:center; max-width:940px; margin:0 auto; }
+  .filebar .lbl { font-size:11px; color:var(--muted); }
+  .fbtn { font-family:Menlo,monospace; font-size:11.5px; padding:3px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
   .fbtn.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
   .fbtn .fd { font-family:"Hiragino Kaku Gothic ProN",sans-serif; font-size:11px; margin-left:6px; }
   .fbtn .fd.ok { color:var(--ok-fg); } .fbtn.on .fd.ok { color:inherit; }
   .fbtn .fd.warn { color:var(--warn-fg); } .fbtn.on .fd.warn { color:inherit; }
-  .summary { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px; }
-  .summary .lb { font-size:11px; font-weight:700; color:var(--accent); letter-spacing:.08em; }
-  .guide { background:var(--surface); border:2px solid var(--accent); border-radius:12px; padding:12px 16px; margin-bottom:12px; font-size:13.5px; }
-  .guide b { font-size:14.5px; }
-  .gbtn { font-family:inherit; font-size:12.5px; padding:5px 14px; border-radius:8px; border:none; background:var(--accent); color:var(--bg); cursor:pointer; margin-top:6px; }
-  .filehead { font-size:14.5px; font-weight:700; margin:22px 0 8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .filehead .role { font-weight:400; color:var(--muted); font-size:13px; }
-  .achip { font-size:10.5px; font-weight:400; background:var(--soft); color:var(--muted); padding:1px 8px; border-radius:999px; }
+  .summary { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:9px 14px; margin-bottom:10px; font-size:13px; }
+  .summary .lb { font-size:10.5px; font-weight:700; color:var(--accent); letter-spacing:.08em; }
+  .guide { border-left:3px solid var(--accent); padding:2px 12px; margin-bottom:10px; font-size:12.5px; color:var(--muted); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .gbtn { font-family:inherit; font-size:11px; padding:1px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); cursor:pointer; }
+  .filehead { font-size:13px; font-weight:700; margin:16px 0 6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .filehead .role { font-weight:400; color:var(--muted); font-size:12px; }
+  .achip { font-size:10px; font-weight:400; background:var(--soft); color:var(--muted); padding:0 7px; border-radius:999px; }
   .pairsfile { border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:20px; background:var(--surface); }
   .sec { display:grid; grid-template-columns:minmax(0,26rem) minmax(0,1fr); }
   .sec + .sec .sec-l { border-top:1px solid var(--line); }
@@ -56,36 +55,38 @@
   .sec.imp .sec-l { box-shadow:inset 3px 0 0 var(--warn-fg); }
   .sec.done-ok .sec-l { box-shadow:inset 3px 0 0 var(--ok-fg); }
   .sec.done-ng .sec-l { box-shadow:inset 3px 0 0 var(--crit-fg); }
-  .sec-l { padding:12px 16px 12px; display:flex; flex-direction:column; }
-  .sec-h { font-weight:700; font-size:15px; line-height:1.6; margin-bottom:4px; }
-  .impb { font-size:11px; font-weight:700; color:var(--warn-fg); background:var(--warn-bg); border-radius:999px; padding:1px 8px; margin-right:6px; white-space:nowrap; }
-  .sec-p { font-size:15px; line-height:1.8; }
-  .sec-warn { font-size:13px; color:var(--warn-fg); background:var(--warn-bg); border-radius:8px; padding:7px 12px; margin-top:8px; line-height:1.7; }
-  .sec-a { font-size:11.5px; color:var(--muted); font-family:Menlo,monospace; margin-top:6px; }
+  .sec-l { padding:9px 14px 9px; display:flex; flex-direction:column; }
+  .sec-h { font-weight:700; font-size:13.5px; line-height:1.6; margin-bottom:2px; display:flex; align-items:baseline; gap:8px; }
+  .sec-h .sec-a { margin:0 0 0 auto; font-weight:400; }
+  .impb { font-size:10px; font-weight:700; color:var(--warn-fg); background:var(--warn-bg); border-radius:999px; padding:0 7px; white-space:nowrap; }
+  .sec-p { font-size:13.5px; line-height:1.75; color:var(--ink); }
+  .sec-warn { font-size:12px; color:var(--warn-fg); background:var(--warn-bg); border-radius:6px; padding:4px 10px; margin-top:6px; line-height:1.65; }
+  .sec-a { font-size:10.5px; color:var(--muted); font-family:Menlo,monospace; }
   .sec-r { background:#1F2428; color:#D6DEE3; padding:8px 0; overflow-x:auto; font-family:Menlo,monospace; font-size:12px; line-height:1.75; }
   .ln { display:flex; padding:0 14px; white-space:pre; }
   .ln .no { width:32px; color:#5C666D; flex-shrink:0; user-select:none; }
   .kw { border-bottom:1px dotted #7BA8C4; cursor:help; }
   .c-com { color:#8A99A3; } .c-str { color:#E8B36A; } .c-key { color:#8FBFE8; }
-  .ctrl { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .ctrl button { font-family:inherit; font-size:13px; padding:6px 14px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
-  .ctrl .ok { border-color:var(--ok-fg); color:var(--ok-fg); }
-  .ctrl .ng { border-color:var(--crit-fg); color:var(--crit-fg); }
-  .ctrl .ok.sel { background:var(--ok-fg); color:var(--surface); }
-  .ctrl .ng.sel { background:var(--crit-fg); color:var(--surface); }
-  .ctrl .uk.sel { background:var(--muted); color:var(--surface); border-color:var(--muted); }
-  .ctrl .undo { font-size:11.5px; color:var(--muted); border:none; text-decoration:underline; background:none; }
-  .cwrap { margin-top:8px; }
-  .cwrap summary { font-size:12px; color:var(--muted); cursor:pointer; }
-  .cwrap textarea { width:100%; min-height:56px; margin-top:6px; font-family:inherit; font-size:13px; line-height:1.6; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); resize:vertical; }
-  .cwrap .saved { font-size:11px; color:var(--ok-fg); margin-left:6px; }
-  .comment-view { font-size:13px; background:var(--soft); border-radius:8px; padding:7px 12px; margin-top:8px; }
-  .comment-view .cl { font-size:11px; font-weight:700; color:var(--muted); }
+  .ctrl { margin-top:auto; padding-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; opacity:.55; transition:opacity .15s; }
+  .sec:hover .ctrl, .sec:focus-within .ctrl { opacity:1; }
+  .ctrl button { font-family:inherit; font-size:11.5px; padding:2px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); cursor:pointer; }
+  .ctrl .ok:hover { border-color:var(--ok-fg); color:var(--ok-fg); }
+  .ctrl .ng:hover { border-color:var(--crit-fg); color:var(--crit-fg); }
+  .ctrl .st { font-size:11.5px; font-weight:700; padding:1px 9px; border-radius:999px; }
+  .ctrl .st.ok { background:var(--ok-bg); color:var(--ok-fg); }
+  .ctrl .st.ng { background:var(--crit-bg); color:var(--crit-fg); }
+  .ctrl .st.uk { background:var(--soft); color:var(--muted); }
+  .ctrl .undo { font-size:10.5px; color:var(--muted); border:none; text-decoration:underline; background:none; padding:0; }
+  .cwrap summary { font-size:11px; color:var(--muted); cursor:pointer; list-style:none; }
+  .cwrap summary::before { content:"💬 "; }
+  .cwrap textarea { width:100%; min-height:48px; margin-top:5px; font-family:inherit; font-size:12.5px; line-height:1.6; padding:6px 9px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); resize:vertical; }
+  .comment-view { font-size:12px; background:var(--soft); border-radius:6px; padding:4px 10px; margin-top:6px; }
+  .comment-view .cl { font-size:10px; font-weight:700; color:var(--muted); }
   .sec.veiled { cursor:pointer; }
   .sec.veiled .sec-h, .sec.veiled .sec-p, .sec.veiled .ctrl, .sec.veiled .cwrap, .sec.veiled .comment-view { display:none; }
   .sec.veiled .sec-l::before { content:"❓ この数行は何をしている? — まず右のコードを読んで予想 → ここをクリックで答え"; color:var(--muted); font-size:13px; display:block; line-height:1.7; }
   body.en .sec.veiled .sec-l::before { content:"❓ What do these lines do? — read the code, make a guess, then click here for the answer"; }
-  .verdict { border-radius:12px; padding:14px 18px; font-size:14px; margin-top:20px; }
+  .verdict { border-radius:10px; padding:10px 14px; font-size:12.5px; margin-top:16px; }
   .verdict.locked { background:var(--crit-bg); color:var(--crit-fg); }
   .verdict.open { background:var(--ok-bg); color:var(--ok-fg); }
   .verdict ul { margin:6px 0 0; padding-left:1.4em; }
@@ -143,6 +144,8 @@ const UI = {
     btnOk: "✓ 問題ない", btnNg: "✗ おかしい", btnUk: "? わからない",
     ansOk: "✓ 問題ないと回答済み", ansNg: "✗ おかしいと回答済み(チャットで「たまった指摘を直して」)",
     ansUk: "? わからないと回答済み(チャットで聞けば説明します)", undo: "取り消す",
+    stOk: "✓ 確認済み", stNg: "✗ 要修正", stUk: "? 保留",
+    guideShort: "使い方: 上のファイル名を押す → 説明を読む → ✓ / ✗ / ? を押す。✗とコメントはチャットで「たまった指摘を直して」と言えばAIが対応。",
     cmtOpen: "コメントを書く", cmtPh: "例: ここは確認画面を挟んでほしい", save: "保存",
     yourCmt: "あなたのコメント", edit: "編集",
     unreadH: "まだ読めていないファイル", unread: "未読",
@@ -168,6 +171,8 @@ const UI = {
     btnOk: "✓ Looks right", btnNg: "✗ Wrong", btnUk: "? Not sure",
     ansOk: "✓ Marked as fine", ansNg: '✗ Marked wrong (say "fix the flagged items" in chat)',
     ansUk: "? Marked unsure (ask in chat for an explanation)", undo: "Undo",
+    stOk: "✓ Reviewed", stNg: "✗ Flagged", stUk: "? On hold",
+    guideShort: 'How to: press a file name above → read each unit → press ✓ / ✗ / ?. ✗ answers and comments are fixed when you say "fix the flagged items" in chat.',
     cmtOpen: "Write a comment", cmtPh: "e.g. add a confirmation screen before sending", save: "Save",
     yourCmt: "Your comment", edit: "Edit",
     unreadH: "Files not yet read", unread: "unread",
@@ -271,7 +276,7 @@ function render() {
 
   let h = "";
   if (!localStorage.getItem("ct-guide-hide")) {
-    h += `<div class="guide">${L.guide}<br><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
+    h += `<div class="guide"><span>${L.guideShort}</span><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
   }
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
 
@@ -300,12 +305,11 @@ function render() {
       const border = st.v === "ok" ? " done-ok" : (st.v === "ng" || st.v === "uk") ? " done-ng" : "";
       h += `<div class="sec${imp ? " imp" : ""}${border}${veiled ? " veiled" : ""}" id="sec-${esc(k).replace(/[^a-zA-Z0-9]/g, "_")}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
         <div class="sec-l">
-          <div class="sec-h">${imp ? `<span class="impb">${L.caution}</span>` : ""}${esc(s.heading)}</div>
+          <div class="sec-h">${imp ? `<span class="impb">${L.caution}</span>` : ""}${esc(s.heading)}<span class="sec-a">${L.lines(esc(String(s.lines)))}</span></div>
           <div class="sec-p">${esc(s.prose)}</div>
           ${secCards.map(c => `<div class="sec-warn">⚠ ${esc(c.title)} — ${esc(c.body)}</div>`).join("")}
-          <div class="sec-a">${L.lines(esc(String(s.lines)))}</div>
           <div class="ctrl">${st.v
-            ? `<span style="font-size:13px">${st.v === "ok" ? L.ansOk : st.v === "ng" ? L.ansNg : L.ansUk}</span><button class="undo" onclick="ans(event,${ki},null)">${L.undo}</button>`
+            ? `<span class="st ${st.v}" title="${st.v === "ok" ? L.ansOk : st.v === "ng" ? L.ansNg : L.ansUk}">${st.v === "ok" ? L.stOk : st.v === "ng" ? L.stNg : L.stUk}</span><button class="undo" onclick="ans(event,${ki},null)">${L.undo}</button>`
             : `<button class="ok" onclick="ans(event,${ki},'ok')">${L.btnOk}</button>
                <button class="ng" onclick="ans(event,${ki},'ng')">${L.btnNg}</button>
                <button class="uk" onclick="ans(event,${ki},'uk')">${L.btnUk}</button>`}</div>
