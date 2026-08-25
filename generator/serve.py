@@ -23,6 +23,10 @@ _lock = threading.Lock()
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map,
+                      ".html": "text/html; charset=utf-8",
+                      ".json": "application/json; charset=utf-8"}
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(DIR), **kwargs)
 

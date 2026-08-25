@@ -20,6 +20,7 @@ def main():
     title = json.loads(data).get("project_name", "view")
 
     out = (
+        '<meta charset="utf-8">\n'
         f"<title>コード通訳 {title}</title>\n"
         + style + "\n"
         + f"<script>window.EMBEDDED_DATA = {data};</script>\n"
