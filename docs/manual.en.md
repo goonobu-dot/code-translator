@@ -15,6 +15,11 @@ This manual takes 5 minutes. No jargon.
 Your code is displayed in "units of meaning" (a few lines each): **plain-language explanation on the left, the actual code on the right**.
 All you do is read the explanation and **press one of three buttons**.
 
+On narrow screens (a side panel next to Claude Code, or a phone) the layout automatically
+stacks vertically — explanation above, code below. Same features either way.
+
+<img src="images/portrait/01-overview.png" alt="Narrow layout" width="360">
+
 ---
 
 ## 0. Open it (first time only)
