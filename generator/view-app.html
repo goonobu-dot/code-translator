@@ -86,6 +86,8 @@
   #storybar .no2 { font-size:10.5px; color:var(--muted); white-space:nowrap; }
   #storybar button { font-family:inherit; font-size:11.5px; padding:2px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; white-space:nowrap; }
   #storybar .nx { border-color:var(--accent); color:var(--accent); }
+  body.storying .warp { display:none; }
+  body.storying main { padding-bottom:160px; }
   .ctrl { margin-top:auto; padding-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; opacity:.55; transition:opacity .15s; }
   .sec:hover .ctrl, .sec:focus-within .ctrl { opacity:1; }
   .ctrl button { font-family:inherit; font-size:11.5px; padding:2px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); cursor:pointer; }
@@ -247,7 +249,7 @@ function defHeading(name) {
   const s = (DATA.sections || []).find(x => x.file === d.file && inRange(x.lines, d.line));
   return s ? s.heading : d.file;
 }
-function jumpToLine(file, line) {
+function jumpToLine(file, line, instant) {
   if (activeFile !== "__all__" && activeFile !== file) {
     activeFile = file;
     render();
@@ -255,7 +257,7 @@ function jumpToLine(file, line) {
   const ki = SECMETA.findIndex(m => m && m.file === file && m.a <= line && line <= m.b);
   const el = ki >= 0 ? $("s" + ki) : null;
   if (el) {
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.scrollIntoView({ behavior: instant ? "auto" : "smooth", block: "center" });
     el.classList.remove("flash");
     void el.offsetWidth;
     el.classList.add("flash");
@@ -286,14 +288,29 @@ function scopeChain(f, startLine) {
   return chain;
 }
 function jumpFlow(i) {
+  // 物語のジャンプは「そのファイルだけに絞って、瞬時にその場面を出す」(巨大ページの飛行スクロールをしない)
   const st = (DATA.flow || [])[i];
   if (!st || !st.file) return;
-  jumpToLine(st.file, parseInt(String(st.lines).split("-")[0]) || 1);
+  if (activeFile !== st.file) {
+    activeFile = st.file;
+    render();
+  }
+  jumpToLine(st.file, parseInt(String(st.lines).split("-")[0]) || 1, true);
 }
-let storyIdx = -1;
-function startStory() { storyIdx = 0; showStory(); }
+let storyIdx = -1, storyPrevFile = null;
+function startStory() { storyPrevFile = activeFile; storyIdx = 0; document.body.classList.add("storying"); showStory(); }
 function stepStory(d) { storyIdx += d; showStory(); }
-function endStory() { storyIdx = -1; $("storybar").hidden = true; }
+function endStory() {
+  storyIdx = -1;
+  $("storybar").hidden = true;
+  document.body.classList.remove("storying");
+  if (storyPrevFile !== null && storyPrevFile !== activeFile) {
+    activeFile = storyPrevFile;
+    render();
+    window.scrollTo({ top: 0 });
+  }
+  storyPrevFile = null;
+}
 function showStory() {
   const flow = DATA.flow || [];
   if (storyIdx < 0 || storyIdx >= flow.length) return endStory();
