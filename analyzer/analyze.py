@@ -18,10 +18,16 @@ CONFIG_EXTS = {".yml", ".yaml", ".env", ".toml", ".ini", ".plist", ".xml"}
 SKIP_DIRS = {".git", "node_modules", ".code-translate", "__pycache__", "dist", "build", ".venv"}
 MAX_FILE_BYTES = 60_000
 MAX_TOTAL_CHARS = 60_000
+MAX_LINES = 300
 
 MSGS = {
     "ja": {
         "encoding": "文字コードを読めませんでした",
+        "symlink": "リンク(シンボリックリンク)のため未解析",
+        "too_long": "300行を超えるため未解析(この版の上限)",
+        "web_asset": "HTML/CSS/JSON類はこの版では解析対象外",
+        "gap": "(AIの分割から漏れた行)",
+        "gap_prose": "この数行はAIの自動分割に含まれませんでした。右のコードを直接確認してください。",
         "too_large": "ファイルが大きすぎるため未解析",
         "config": "設定ファイル(この版では解析対象外)",
         "unsupported": "この形式は未対応のため未解析",
@@ -34,6 +40,11 @@ MSGS = {
     },
     "en": {
         "encoding": "Could not decode the file",
+        "symlink": "Skipped: symbolic link",
+        "too_long": "Skipped: over 300 lines (limit of this version)",
+        "web_asset": "HTML/CSS/JSON files are not analyzed in this version",
+        "gap": "(lines missed by the AI split)",
+        "gap_prose": "These lines were not covered by the AI's split. Check the code on the right directly.",
         "too_large": "Skipped: file too large",
         "config": "Config file (not analyzed in this version)",
         "unsupported": "Skipped: unsupported file type",
@@ -69,19 +80,28 @@ def collect_files(root: Path, lang="ja"):
             continue
         rel = str(p.relative_to(root))
         ext = p.suffix.lower()
+        if p.is_symlink():
+            if ext in CODE_EXTS or ext in CONFIG_EXTS:
+                unanalyzed.append({"path": rel, "reason": M["symlink"]})
+            continue
         if ext in CODE_EXTS and p.stat().st_size <= MAX_FILE_BYTES:
             try:
                 text = p.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 unanalyzed.append({"path": rel, "reason": M["encoding"]})
                 continue
+            if len(text.splitlines()) > MAX_LINES:
+                unanalyzed.append({"path": rel, "reason": M["too_long"]})
+                continue
             analyzed.append({"path": rel, "text": text})
         elif ext in CODE_EXTS:
             unanalyzed.append({"path": rel, "reason": M["too_large"]})
         elif ext in CONFIG_EXTS:
             unanalyzed.append({"path": rel, "reason": M["config"]})
-        elif ext in {".md", ".txt", ".json", ".lock", ".png", ".jpg", ".gitignore", ".html", ".css"} or p.name.startswith("."):
-            continue  # 明示的に対象外(台帳にも載せない資料類)
+        elif ext in {".html", ".css", ".json"}:
+            unanalyzed.append({"path": rel, "reason": M["web_asset"]})
+        elif ext in {".md", ".txt", ".lock", ".png", ".jpg", ".gitignore"} or p.name.startswith("."):
+            continue  # 文書・画像類は台帳に載せない
         else:
             unanalyzed.append({"path": rel, "reason": M["unsupported"]})
     return analyzed, unanalyzed
@@ -210,17 +230,33 @@ def build_prompt(files, findings, lang="ja"):
 
 
 def call_claude(prompt, model):
+    import shutil
+    if not shutil.which("claude"):
+        print("エラー: Claude Code CLI(claudeコマンド)が見つかりません。\n"
+              "翻訳の生成に必要です。https://claude.com/claude-code からインストールし、"
+              "一度 `claude` を起動してログインしてから再実行してください。", file=sys.stderr)
+        sys.exit(2)
     cmd = ["claude", "-p", prompt, "--output-format", "json", "--model", model]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    except subprocess.TimeoutExpired:
+        print("エラー: AI翻訳が時間内に完了しませんでした(10分)。ネットワークを確認して再実行してください。", file=sys.stderr)
+        sys.exit(2)
     if r.returncode != 0:
-        raise RuntimeError(f"claude CLI failed: {r.stderr[:500]}")
-    outer = json.loads(r.stdout)
-    text = outer.get("result", "")
-    meta = {"cost_usd": outer.get("total_cost_usd"), "duration_ms": outer.get("duration_ms"), "model": model}
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
-        raise RuntimeError("AI出力からJSONを抽出できませんでした: " + text[:300])
-    return json.loads(m.group(0)), meta
+        print("エラー: AI翻訳の実行に失敗しました。`claude` に一度ログインできているか確認してください。\n"
+              f"詳細: {r.stderr[:300]}", file=sys.stderr)
+        sys.exit(2)
+    try:
+        outer = json.loads(r.stdout)
+        text = outer.get("result", "")
+        meta = {"cost_usd": outer.get("total_cost_usd"), "duration_ms": outer.get("duration_ms"), "model": model}
+        m = re.search(r"\{.*\}", text, re.S)
+        if not m:
+            raise ValueError("no json")
+        return json.loads(m.group(0)), meta
+    except (json.JSONDecodeError, ValueError):
+        print("エラー: AIの応答を読み取れませんでした(一時的な不調の可能性)。--force を付けて再実行してください。", file=sys.stderr)
+        sys.exit(2)
 
 
 def main():
@@ -252,7 +288,7 @@ def main():
             prev = json.loads(out_file.read_text())
         except Exception:
             prev = None
-    if prev and not args.force and prev.get("seal", {}).get("hash") == seal["hash"]:
+    if prev and not args.force and prev.get("seal", {}).get("hash") == seal["hash"] and prev.get("lang") == args.lang:
         if prev.get("seal") != seal:
             prev["seal"] = seal
             prev["generated_at"] = datetime.now(timezone.utc).isoformat()
@@ -267,7 +303,34 @@ def main():
 
     for f in analyzed:
         if f.pop("truncated", False):
-            unanalyzed.append({"path": f["path"], "reason": "容量上限のため未解析"})
+            unanalyzed.append({"path": f["path"], "reason": MSGS[args.lang]["truncated"]})
+
+    # AI出力の検証: 「意味のまとまり」が無ければ失敗として扱い、分割から漏れた行は正直に台帳へ載せる
+    sections = ai.get("sections", [])
+    if not sections:
+        print("エラー: AI出力に『意味のまとまり』が含まれていません。--force を付けて再実行してください。", file=sys.stderr)
+        sys.exit(2)
+    for f in analyzed:
+        lines = f["text"].splitlines()
+        covered = set()
+        for s in sections:
+            if s.get("file") != f["path"]:
+                continue
+            m = re.match(r"^(\d+)(?:-(\d+))?$", str(s.get("lines", "")).strip())
+            if not m:
+                continue
+            covered.update(range(int(m.group(1)), int(m.group(2) or m.group(1)) + 1))
+        gap_start = None
+        for i in range(1, len(lines) + 2):
+            missing = i <= len(lines) and i not in covered and lines[i - 1].strip() != ""
+            if missing and gap_start is None:
+                gap_start = i
+            elif not missing and gap_start is not None:
+                sections.append({"file": f["path"], "lines": f"{gap_start}-{i - 1}",
+                                 "heading": MSGS[args.lang]["gap"], "prose": MSGS[args.lang]["gap_prose"]})
+                gap_start = None
+    sections.sort(key=lambda s: (s.get("file", ""), int(str(s.get("lines", "1")).split("-")[0] or 1)))
+    ai["sections"] = sections
 
     data = {
         "lang": args.lang,

@@ -23,6 +23,8 @@ cd ~/Projects/code-translator
 
 # 2. コマンド登録(初回のみ)
 mkdir -p ~/.local/bin && ln -sf "$PWD/bin/code-translate" ~/.local/bin/code-translate
+# ~/.local/bin がPATHにない場合は次の1行も実行(command not found になるとき)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 
 # 3. 翻訳して開く(ブラウザが自動で開きます)
 code-translate ~/あなたのアプリのフォルダ --open

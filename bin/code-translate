@@ -32,11 +32,26 @@ mkdir -p "$VIEW"
 cp "$ROOT/generator/view-app.html" "$VIEW/index.html"
 
 if [ "$OPEN" = 1 ]; then
-  # サーバーが未起動なら起動(回答・コメント保存に対応した専用サーバー)
-  if ! nc -z 127.0.0.1 "$PORT" 2>/dev/null; then
-    nohup python3 "$ROOT/generator/serve.py" "$VIEW" "$PORT" >/dev/null 2>&1 &
-    sleep 0.5
+  # 既存サーバーが「このプロジェクト」を配信しているか確認し、違えば空きポートを使う(取り違え防止)
+  FOUND=""
+  for P in $(seq "$PORT" $((PORT + 9))); do
+    if ! nc -z 127.0.0.1 "$P" 2>/dev/null; then
+      nohup python3 "$ROOT/generator/serve.py" "$VIEW" "$P" >/dev/null 2>&1 &
+      sleep 0.5
+      FOUND="$P"
+      break
+    fi
+    T="$(curl -sf --max-time 2 "http://127.0.0.1:$P/view-data.json" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("target",""))' 2>/dev/null || true)"
+    if [ "$T" = "$TARGET" ]; then
+      FOUND="$P"
+      break
+    fi
+  done
+  if [ -z "$FOUND" ]; then
+    echo "エラー: 使えるポートが見つかりません($PORT〜$((PORT + 9))が全て他の用途で使用中)" >&2
+    exit 1
   fi
+  PORT="$FOUND"
   # ダブルクリックで開ける「ボタン」を対象フォルダに設置(初回のみ)
   BTN="$TARGET/コード通訳を開く.command"
   if [ ! -f "$BTN" ]; then
