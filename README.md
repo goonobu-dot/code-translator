@@ -5,7 +5,8 @@
 > **English**: A tool for non-engineers to read and review AI-generated code in plain language —
 > code is shown in few-line "units of meaning" with parallel explanations, and you review each unit
 > with ✓ (looks right) / ✗ (wrong) / ? (not sure) plus free comments. Answers are saved to a file the AI
-> can read to apply fixes. **[English manual (with screenshots)](docs/manual.en.md)** · UI text is Japanese in v1.
+> can read to apply fixes. **English output and English UI**: run with `--lang en`.
+> **[English manual (with screenshots)](docs/manual.en.md)**
 
 コードを数行の「意味のまとまり」ごとに日本語対訳で表示し、それぞれに
 **✓ 問題ない / ✗ おかしい / ? わからない** とコメントで答えるだけで、
@@ -26,6 +27,8 @@ mkdir -p ~/.local/bin && ln -sf "$PWD/bin/code-translate" ~/.local/bin/code-tran
 # 3. 翻訳して開く(ブラウザが自動で開きます)
 code-translate ~/あなたのアプリのフォルダ --open
 ```
+
+英語で使う場合(English output + English UI): `code-translate <project> --open --lang en`
 
 初回実行時、対象フォルダに **「コード通訳を開く.command」** が置かれます。
 **次からはこのファイルをダブルクリックするだけ**で画面が開きます。

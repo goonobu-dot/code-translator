@@ -81,6 +81,7 @@
   .sec.veiled { cursor:pointer; }
   .sec.veiled .sec-h, .sec.veiled .sec-p, .sec.veiled .ctrl, .sec.veiled .cwrap, .sec.veiled .comment-view { display:none; }
   .sec.veiled .sec-l::before { content:"❓ この数行は何をしている? — まず右のコードを読んで予想 → ここをクリックで答え"; color:var(--muted); font-size:13px; display:block; line-height:1.7; }
+  body.en .sec.veiled .sec-l::before { content:"❓ What do these lines do? — read the code, make a guess, then click here for the answer"; }
   .verdict { border-radius:12px; padding:14px 18px; font-size:14px; margin-top:20px; }
   .verdict.locked { background:var(--crit-bg); color:var(--crit-fg); }
   .verdict.open { background:var(--ok-bg); color:var(--ok-fg); }
@@ -97,7 +98,7 @@
 </head>
 <body>
 <header>
-  <span class="title">📖 コード通訳</span>
+  <span class="title" id="appTitle">📖 コード通訳</span>
   <span class="badge b-warn" id="bProg"></span>
   <span class="badge b-warn" id="bCover"></span>
   <button class="hbtn" id="tVeil"></button>
@@ -107,15 +108,87 @@
 <main id="main"></main>
 <div id="toast"></div>
 <script>
-const KW = {
-  "function":"「処理のまとまり」を作る合図", "const":"名前をつけて値を保管する箱", "let":"あとで中身を変えられる箱",
-  "if":"もし〜なら", "else":"そうでなければ", "return":"この手順をここで終える合図",
-  "await":"結果を待ってから次へ進む", "async":"待ち時間のある処理の目印", "require":"別のファイルの機能を読み込む",
-  "for":"繰り返し処理", "while":"条件が続く間繰り返す", "try":"失敗するかもしれない処理を試す",
-  "catch":"失敗したときの受け皿", "throw":"エラーを発生させて知らせる", "new":"新しいものを作る",
-  "process":"アプリの実行環境(環境変数など)",
+const KW_ALL = {
+  ja: {
+    "function":"「処理のまとまり」を作る合図", "const":"名前をつけて値を保管する箱", "let":"あとで中身を変えられる箱",
+    "if":"もし〜なら", "else":"そうでなければ", "return":"この手順をここで終える合図",
+    "await":"結果を待ってから次へ進む", "async":"待ち時間のある処理の目印", "require":"別のファイルの機能を読み込む",
+    "for":"繰り返し処理", "while":"条件が続く間繰り返す", "try":"失敗するかもしれない処理を試す",
+    "catch":"失敗したときの受け皿", "throw":"エラーを発生させて知らせる", "new":"新しいものを作る",
+    "process":"アプリの実行環境(環境変数など)",
+  },
+  en: {
+    "function":"defines a reusable procedure", "const":"a named box holding a value", "let":"a box whose value can change",
+    "if":"only if the condition holds", "else":"otherwise", "return":"end here and hand back a result",
+    "await":"wait for the result before moving on", "async":"marks a procedure that may involve waiting", "require":"load features from another file",
+    "for":"repeat", "while":"repeat while the condition holds", "try":"attempt something that may fail",
+    "catch":"handle the failure", "throw":"raise an error", "new":"create a new object",
+    "process":"the app's runtime environment (env vars etc.)",
+  },
 };
-const THEMES = [["auto","配色: 自動"],["light","配色: ライト"],["dark","配色: ダーク"]];
+let KW = KW_ALL.ja;
+const THEMES = ["auto", "light", "dark"];
+const UI = {
+  ja: {
+    themes: { auto: "配色: 自動", light: "配色: ライト", dark: "配色: ダーク" },
+    progLeft: n => `残り ${n}個`, progTodo: "回答済み(要対応あり)", progDone: "全部確認ずみ ✓",
+    cover: (a, b) => `読めた範囲 ${a}/${b}`, veilOn: "学習中(答えを隠す)", veilOff: "学習モード",
+    pick: "見たいコードを押す:", all: "すべて", fleft: n => `残り${n}`,
+    guide: `<b>使い方は2つだけ</b><br>① 上の<b>ファイル名のボタンを押す</b>と、そのコードが翻訳つきで表示されます(翻訳はもう終わっています)。<br>② 各まとまりの説明を読んで、<b>「✓ 問題ない / ✗ おかしい / ? わからない」のどれかを押す</b>。気になることは「コメントを書く」にどうぞ。「✗」やコメントは、チャットで「たまった指摘を直して」と言えばAIがまとめて対応します。`,
+    gotIt: "わかった(閉じる)", sumLb: "このシステムは何をするものか", author: "書き手",
+    caution: "⚠ 注意", lines: s => `${s}行目`,
+    btnOk: "✓ 問題ない", btnNg: "✗ おかしい", btnUk: "? わからない",
+    ansOk: "✓ 問題ないと回答済み", ansNg: "✗ おかしいと回答済み(チャットで「たまった指摘を直して」)",
+    ansUk: "? わからないと回答済み(チャットで聞けば説明します)", undo: "取り消す",
+    cmtOpen: "コメントを書く", cmtPh: "例: ここは確認画面を挟んでほしい", save: "保存",
+    yourCmt: "あなたのコメント", edit: "編集",
+    unreadH: "まだ読めていないファイル", unread: "未読",
+    vOk: "✅ <b>全部確認できました。</b>すべてのまとまりに「問題ない」と回答済みで、重大な問題は見つかっていません。",
+    vNg: "🔒 <b>まだ確認は終わっていません。</b>",
+    vRemain: n => `読んでいないまとまりが ${n}個`, vNgs: n => `「✗ おかしい」が ${n}件(チャットで「たまった指摘を直して」)`,
+    vUks: n => `「? わからない」が ${n}件(チャットで聞けば説明します)`, vUnread: n => `まだ読めていないファイルが ${n}件`,
+    vCrit: n => `重大な問題(キーの置き忘れ等)が ${n}件`, vDirty: "保存(コミット)されていない変更があります",
+    findings: n => `自動チェックの記録(参考・${n}件)`,
+    note: (t, c) => `生成: ${t} / コードが変わると画面と回答は自動で新しい版に切り替わります。コードの行にマウスを乗せると1行ずつの訳が出ます。${c ? ` / コメント ${c}件` : ""}`,
+    warp: n => `⚠ 次の注意箇所へ (${n})`, mechNone: "この箇所への機械検出はなし(AIの読み取りのみ——断定はしていません)",
+    mech: "自動チェック", toastUpd: "翻訳が更新されました", toastLocal: "この画面では回答はこの端末にのみ保存されます",
+    noData: "まだ翻訳データがありません。チャットで「コードを翻訳して」と言ってください。",
+  },
+  en: {
+    themes: { auto: "Theme: auto", light: "Theme: light", dark: "Theme: dark" },
+    progLeft: n => `${n} left`, progTodo: "Answered (action needed)", progDone: "All reviewed ✓",
+    cover: (a, b) => `Read ${a}/${b} files`, veilOn: "Learning (answers hidden)", veilOff: "Learning mode",
+    pick: "Pick a file:", all: "All", fleft: n => `${n} left`,
+    guide: `<b>Just two things</b><br>① <b>Press a file name</b> above — that file appears, already translated.<br>② Read each unit and press <b>"✓ Looks right / ✗ Wrong / ? Not sure"</b>. Anything on your mind goes into "Write a comment". ✗ answers and comments are handled in bulk when you tell the AI "fix the flagged items" in chat.`,
+    gotIt: "Got it (close)", sumLb: "What this system does", author: "Author",
+    caution: "⚠ Caution", lines: s => `Lines ${s}`,
+    btnOk: "✓ Looks right", btnNg: "✗ Wrong", btnUk: "? Not sure",
+    ansOk: "✓ Marked as fine", ansNg: '✗ Marked wrong (say "fix the flagged items" in chat)',
+    ansUk: "? Marked unsure (ask in chat for an explanation)", undo: "Undo",
+    cmtOpen: "Write a comment", cmtPh: "e.g. add a confirmation screen before sending", save: "Save",
+    yourCmt: "Your comment", edit: "Edit",
+    unreadH: "Files not yet read", unread: "unread",
+    vOk: "✅ <b>Everything reviewed.</b> Every unit is marked \"Looks right\" and nothing critical was detected.",
+    vNg: "🔒 <b>Review not finished yet.</b>",
+    vRemain: n => `${n} units not reviewed yet`, vNgs: n => `${n} marked "✗ Wrong" (say "fix the flagged items" in chat)`,
+    vUks: n => `${n} marked "? Not sure" (ask in chat for an explanation)`, vUnread: n => `${n} files not yet read`,
+    vCrit: n => `${n} critical issues (e.g. a leaked secret key)`, vDirty: "There are uncommitted changes",
+    findings: n => `Automated check log (reference, ${n})`,
+    note: (t, c) => `Generated: ${t} / The page and answers switch automatically when the code changes. Hover a code line for its line-by-line translation.${c ? ` / Comments: ${c}` : ""}`,
+    warp: n => `⚠ Next caution spot (${n})`, mechNone: "No automated detection here (AI reading only — not a guarantee)",
+    mech: "Automated check", toastUpd: "Translation updated", toastLocal: "On this page, answers are saved on this device only",
+    noData: 'No translation data yet. Ask in chat to translate the code.',
+  },
+};
+let L = UI.ja;
+function setLang() {
+  const lg = DATA && DATA.lang === "en" ? "en" : "ja";
+  L = UI[lg];
+  KW = KW_ALL[lg];
+  document.body.classList.toggle("en", lg === "en");
+  document.documentElement.lang = lg;
+  $("appTitle").textContent = lg === "en" ? "📖 Code Interpreter" : "📖 コード通訳";
+}
 let DATA = null, REVIEW = {}, generatedAt = null, canPost = true, activeFile = "__all__";
 let VEIL = localStorage.getItem("ct-veil") === "1";
 const $ = id => document.getElementById(id);
@@ -127,11 +200,11 @@ function applyTheme() {
   const t = localStorage.getItem("ct-theme") || "auto";
   if (t === "auto") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = t;
-  $("tTheme").textContent = (THEMES.find(x => x[0] === t) || THEMES[0])[1];
+  $("tTheme").textContent = L.themes[THEMES.includes(t) ? t : "auto"];
 }
 $("tTheme").onclick = () => {
   const c = localStorage.getItem("ct-theme") || "auto";
-  localStorage.setItem("ct-theme", THEMES[(THEMES.findIndex(x => x[0] === c) + 1) % THEMES.length][0]);
+  localStorage.setItem("ct-theme", THEMES[(THEMES.indexOf(c) + 1) % THEMES.length]);
   applyTheme();
 };
 $("tVeil").onclick = () => { VEIL = !VEIL; localStorage.setItem("ct-veil", VEIL ? "1" : "0"); render(); };
@@ -142,7 +215,7 @@ async function saveReview() {
   try {
     const r = await fetch("/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(REVIEW) });
     if (!r.ok) throw 0;
-  } catch { canPost = false; toast("この画面では回答はこの端末にのみ保存されます"); }
+  } catch { canPost = false; toast(L.toastLocal); }
 }
 function parseLines(spec) {
   const out = [];
@@ -174,31 +247,27 @@ function render() {
   const crit = d.machine_findings.filter(f => f.severity === "critical").length;
   const remain = secs.length - answered;
 
-  $("bProg").textContent = remain ? `残り ${remain}個` : (ngs || uks) ? "回答済み(要対応あり)" : "全部確認ずみ ✓";
+  $("bProg").textContent = remain ? L.progLeft(remain) : (ngs || uks) ? L.progTodo : L.progDone;
   $("bProg").className = "badge " + (remain ? "b-warn" : (ngs || uks) ? "b-crit" : "b-ok");
-  $("bCover").textContent = `読めた範囲 ${d.files.length}/${d.files.length + d.unanalyzed.length}`;
+  $("bCover").textContent = L.cover(d.files.length, d.files.length + d.unanalyzed.length);
   $("bCover").className = "badge " + (d.unanalyzed.length ? "b-warn" : "b-ok");
-  $("tVeil").textContent = VEIL ? "学習中(答えを隠す)" : "学習モード";
+  $("tVeil").textContent = VEIL ? L.veilOn : L.veilOff;
   $("tVeil").className = "hbtn" + (VEIL ? " on" : "");
 
-  const fb = ['<span class="lbl">見たいコードを押す:</span>'];
-  fb.push(`<button class="fbtn${activeFile === "__all__" ? " on" : ""}" onclick="setFile('__all__')">すべて</button>`);
+  const fb = [`<span class="lbl">${L.pick}</span>`];
+  fb.push(`<button class="fbtn${activeFile === "__all__" ? " on" : ""}" onclick="setFile('__all__')">${L.all}</button>`);
   for (const f of d.files) {
     const fsecs = secs.filter(s => s.file === f.path);
     const rem = fsecs.filter(s => !(rv[secKey(s)] || {}).v).length;
-    fb.push(`<button class="fbtn${activeFile === f.path ? " on" : ""}" onclick="setFile('${esc(f.path)}')">${esc(f.path)}<span class="fd ${rem ? "warn" : "ok"}">${rem ? "残り" + rem : "✓"}</span></button>`);
+    fb.push(`<button class="fbtn${activeFile === f.path ? " on" : ""}" onclick="setFile('${esc(f.path)}')">${esc(f.path)}<span class="fd ${rem ? "warn" : "ok"}">${rem ? L.fleft(rem) : "✓"}</span></button>`);
   }
   $("filebar").innerHTML = fb.join("");
 
   let h = "";
   if (!localStorage.getItem("ct-guide-hide")) {
-    h += `<div class="guide"><b>使い方は2つだけ</b><br>
-      ① 上の<b>ファイル名のボタンを押す</b>と、そのコードが翻訳つきで表示されます(翻訳はもう終わっています)。<br>
-      ② 各まとまりの説明を読んで、<b>「✓ 問題ない / ✗ おかしい / ? わからない」のどれかを押す</b>。気になることは「コメントを書く」にどうぞ。
-      「✗」やコメントは、チャットで「たまった指摘を直して」と言えばAIがまとめて対応します。<br>
-      <button class="gbtn" onclick="hideGuide()">わかった(閉じる)</button></div>`;
+    h += `<div class="guide">${L.guide}<br><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
   }
-  h += `<div class="summary"><span class="lb">このシステムは何をするものか</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
+  h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
 
   let impCount = 0;
   for (const f of d.files) {
@@ -207,7 +276,7 @@ function render() {
     if (!fsecs.length) continue;
     const ltMap = {};
     d.line_translations.filter(t => t.file === f.path).forEach(t => ltMap[t.line] = t);
-    h += `<div class="filehead">${esc(f.path)}<span class="role">${f.role ? "— " + esc(f.role) : ""}</span>${f.author ? `<span class="achip">書き手: ${esc(f.author)}</span>` : ""}</div>`;
+    h += `<div class="filehead">${esc(f.path)}<span class="role">${f.role ? "— " + esc(f.role) : ""}</span>${f.author ? `<span class="achip">${L.author}: ${esc(f.author)}</span>` : ""}</div>`;
     for (const s of fsecs) {
       const k = secKey(s), st = rv[k] || {};
       const lines = parseLines(s.lines);
@@ -224,45 +293,45 @@ function render() {
       const border = st.v === "ok" ? " done-ok" : (st.v === "ng" || st.v === "uk") ? " done-ng" : "";
       h += `<div class="sec${imp ? " imp" : ""}${border}${veiled ? " veiled" : ""}" id="sec-${esc(k).replace(/[^a-zA-Z0-9]/g, "_")}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
         <div class="sec-l">
-          <div class="sec-h">${imp ? `<span class="impb">⚠ 注意</span>` : ""}${esc(s.heading)}</div>
+          <div class="sec-h">${imp ? `<span class="impb">${L.caution}</span>` : ""}${esc(s.heading)}</div>
           <div class="sec-p">${esc(s.prose)}</div>
           ${secCards.map(c => `<div class="sec-warn">⚠ ${esc(c.title)} — ${esc(c.body)}</div>`).join("")}
-          <div class="sec-a">${esc(s.lines)}行目</div>
+          <div class="sec-a">${L.lines(esc(String(s.lines)))}</div>
           <div class="ctrl">${st.v
-            ? `<span style="font-size:13px">${st.v === "ok" ? "✓ 問題ないと回答済み" : st.v === "ng" ? "✗ おかしいと回答済み(チャットで「たまった指摘を直して」)" : "? わからないと回答済み(チャットで聞けば説明します)"}</span><button class="undo" onclick="ans(event,'${esc(k)}',null)">取り消す</button>`
-            : `<button class="ok" onclick="ans(event,'${esc(k)}','ok')">✓ 問題ない</button>
-               <button class="ng" onclick="ans(event,'${esc(k)}','ng')">✗ おかしい</button>
-               <button class="uk" onclick="ans(event,'${esc(k)}','uk')">? わからない</button>`}</div>
+            ? `<span style="font-size:13px">${st.v === "ok" ? L.ansOk : st.v === "ng" ? L.ansNg : L.ansUk}</span><button class="undo" onclick="ans(event,'${esc(k)}',null)">${L.undo}</button>`
+            : `<button class="ok" onclick="ans(event,'${esc(k)}','ok')">${L.btnOk}</button>
+               <button class="ng" onclick="ans(event,'${esc(k)}','ng')">${L.btnNg}</button>
+               <button class="uk" onclick="ans(event,'${esc(k)}','uk')">${L.btnUk}</button>`}</div>
           ${st.comment
-            ? `<div class="comment-view"><span class="cl">あなたのコメント</span><br>${esc(st.comment)} <button class="undo" style="font-size:11px" onclick="editComment(event,'${esc(k)}')">編集</button></div>`
-            : `<details class="cwrap" onclick="event.stopPropagation()"><summary>コメントを書く</summary>
-               <textarea id="ta-${esc(k).replace(/[^a-zA-Z0-9]/g, "_")}" placeholder="例: ここは確認画面を挟んでほしい"></textarea>
-               <button class="hbtn" onclick="saveComment(event,'${esc(k)}')">保存</button></details>`}
+            ? `<div class="comment-view"><span class="cl">${L.yourCmt}</span><br>${esc(st.comment)} <button class="undo" style="font-size:11px" onclick="editComment(event,'${esc(k)}')">${L.edit}</button></div>`
+            : `<details class="cwrap" onclick="event.stopPropagation()"><summary>${L.cmtOpen}</summary>
+               <textarea id="ta-${esc(k).replace(/[^a-zA-Z0-9]/g, "_")}" placeholder="${L.cmtPh}"></textarea>
+               <button class="hbtn" onclick="saveComment(event,'${esc(k)}')">${L.save}</button></details>`}
         </div>
         <div class="sec-r">${code}</div></div>`;
     }
   }
 
   if (d.unanalyzed.length) {
-    h += `<h3 style="font-size:13px;color:var(--muted)">まだ読めていないファイル</h3><div class="findings"><ul>` +
-      d.unanalyzed.map(u => `<li><span class="sev">未読</span>${esc(u.path)} — ${esc(u.reason)}</li>`).join("") + `</ul></div>`;
+    h += `<h3 style="font-size:13px;color:var(--muted)">${L.unreadH}</h3><div class="findings"><ul>` +
+      d.unanalyzed.map(u => `<li><span class="sev">${L.unread}</span>${esc(u.path)} — ${esc(u.reason)}</li>`).join("") + `</ul></div>`;
   }
 
   const ok = remain === 0 && ngs === 0 && uks === 0 && d.unanalyzed.length === 0 && crit === 0 && !d.seal.dirty;
-  h += `<div class="verdict ${ok ? "open" : "locked"}">${ok ? "✅ <b>全部確認できました。</b>すべてのまとまりに「問題ない」と回答済みで、重大な問題は見つかっていません。" : "🔒 <b>まだ確認は終わっていません。</b>"}<ul>`
-    + (remain ? `<li>読んでいないまとまりが ${remain}個</li>` : "")
-    + (ngs ? `<li>「✗ おかしい」が ${ngs}件(チャットで「たまった指摘を直して」)</li>` : "")
-    + (uks ? `<li>「? わからない」が ${uks}件(チャットで聞けば説明します)</li>` : "")
-    + (d.unanalyzed.length ? `<li>まだ読めていないファイルが ${d.unanalyzed.length}件</li>` : "")
-    + (crit ? `<li>重大な問題(キーの置き忘れ等)が ${crit}件</li>` : "")
-    + (d.seal.dirty ? `<li>保存(コミット)されていない変更があります</li>` : "")
+  h += `<div class="verdict ${ok ? "open" : "locked"}">${ok ? L.vOk : L.vNg}<ul>`
+    + (remain ? `<li>${L.vRemain(remain)}</li>` : "")
+    + (ngs ? `<li>${L.vNgs(ngs)}</li>` : "")
+    + (uks ? `<li>${L.vUks(uks)}</li>` : "")
+    + (d.unanalyzed.length ? `<li>${L.vUnread(d.unanalyzed.length)}</li>` : "")
+    + (crit ? `<li>${L.vCrit(crit)}</li>` : "")
+    + (d.seal.dirty ? `<li>${L.vDirty}</li>` : "")
     + `</ul></div>`;
   if (d.machine_findings.length) {
-    h += `<details class="findings"><summary style="cursor:pointer">自動チェックの記録(参考・${d.machine_findings.length}件)</summary><ul style="margin-top:6px">` +
+    h += `<details class="findings"><summary style="cursor:pointer">${L.findings(d.machine_findings.length)}</summary><ul style="margin-top:6px">` +
       d.machine_findings.map(f => `<li><span class="sev sev-${f.severity === "critical" ? "critical" : ""}">${f.severity}</span>${esc(f.file)}:${f.line} — ${esc(f.note)}</li>`).join("") + `</ul></details>`;
   }
-  h += `<p class="note">生成: ${new Date(d.generated_at).toLocaleString("ja-JP")} / コードが変わると画面と回答は自動で新しい版に切り替わります。コードの行にマウスを乗せると1行ずつの訳が出ます。${comments ? ` / コメント ${comments}件` : ""}</p>`;
-  if (impCount) h += `<button class="warp" onclick="nextImp()">⚠ 次の注意箇所へ (${impCount})</button>`;
+  h += `<p class="note">${L.note(new Date(d.generated_at).toLocaleString(DATA.lang === "en" ? "en-US" : "ja-JP"), comments)}</p>`;
+  if (impCount) h += `<button class="warp" onclick="nextImp()">${L.warp(impCount)}</button>`;
   $("main").innerHTML = h;
 }
 function ans(ev, k, v) {
@@ -308,7 +377,9 @@ async function load(first) {
       DATA = window.EMBEDDED_DATA;
       canPost = false;
       try { REVIEW = JSON.parse(localStorage.getItem("ct-review")) || {}; } catch { REVIEW = {}; }
-      document.title = "コード通訳 — " + DATA.project_name;
+      setLang();
+      document.title = (DATA.lang === "en" ? "Code Interpreter — " : "コード通訳 — ") + DATA.project_name;
+      applyTheme();
       render();
     }
     return;
@@ -321,12 +392,14 @@ async function load(first) {
       DATA = d;
       try { REVIEW = await (await fetch("review.json?ts=" + Date.now())).json(); }
       catch { try { REVIEW = JSON.parse(localStorage.getItem("ct-review")) || {}; } catch { REVIEW = {}; } }
-      document.title = "コード通訳 — " + d.project_name;
+      setLang();
+      document.title = (DATA.lang === "en" ? "Code Interpreter — " : "コード通訳 — ") + d.project_name;
+      applyTheme();
       render();
-      if (!first) toast("翻訳が更新されました");
+      if (!first) toast(L.toastUpd);
     }
   } catch {
-    if (first) $("main").innerHTML = `<p style="color:var(--crit-fg);padding:16px">まだ翻訳データがありません。チャットで「コードを翻訳して」と言ってください。</p>`;
+    if (first) $("main").innerHTML = `<p style="color:var(--crit-fg);padding:16px">${L.noData}</p>`;
   }
 }
 applyTheme();

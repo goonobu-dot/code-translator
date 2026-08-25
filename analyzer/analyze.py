@@ -19,6 +19,33 @@ SKIP_DIRS = {".git", "node_modules", ".code-translate", "__pycache__", "dist", "
 MAX_FILE_BYTES = 60_000
 MAX_TOTAL_CHARS = 60_000
 
+MSGS = {
+    "ja": {
+        "encoding": "文字コードを読めませんでした",
+        "too_large": "ファイルが大きすぎるため未解析",
+        "config": "設定ファイル(この版では解析対象外)",
+        "unsupported": "この形式は未対応のため未解析",
+        "truncated": "容量上限のため未解析",
+        "secret": "秘密の値(APIキー等)の直書きを検出",
+        "sql": "命令文の文字列連結を検出(不正な命令混入の恐れ)",
+        "pii": "個人情報らしき値のログ出力を検出",
+        "delete": "削除系の操作を検出",
+        "url": "外部ホストへの参照",
+    },
+    "en": {
+        "encoding": "Could not decode the file",
+        "too_large": "Skipped: file too large",
+        "config": "Config file (not analyzed in this version)",
+        "unsupported": "Skipped: unsupported file type",
+        "truncated": "Skipped: size limit reached",
+        "secret": "Hardcoded secret (API key etc.) detected",
+        "sql": "String-concatenated query detected (injection risk)",
+        "pii": "Personal data written to logs detected",
+        "delete": "Delete operation detected",
+        "url": "Reference to external host",
+    },
+}
+
 SECRET_RE = re.compile(
     r"""(?i)(\w*(api[_-]?key|secret|token|passw(or)?d)\w*\s*[:=]\s*['"][^'"]{8,}['"]"""
     r"""|['"](sk_live_|sk_test_|AKIA|ghp_|xox[bp]-)[A-Za-z0-9_\-]{6,}['"])""")
@@ -32,7 +59,8 @@ def sh(cmd, cwd=None, timeout=300):
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
 
 
-def collect_files(root: Path):
+def collect_files(root: Path, lang="ja"):
+    M = MSGS[lang]
     analyzed, unanalyzed = [], []
     for p in sorted(root.rglob("*")):
         if not p.is_file():
@@ -45,39 +73,40 @@ def collect_files(root: Path):
             try:
                 text = p.read_text(encoding="utf-8")
             except UnicodeDecodeError:
-                unanalyzed.append({"path": rel, "reason": "文字コードを読めませんでした"})
+                unanalyzed.append({"path": rel, "reason": M["encoding"]})
                 continue
             analyzed.append({"path": rel, "text": text})
         elif ext in CODE_EXTS:
-            unanalyzed.append({"path": rel, "reason": "ファイルが大きすぎるため未解析"})
+            unanalyzed.append({"path": rel, "reason": M["too_large"]})
         elif ext in CONFIG_EXTS:
-            unanalyzed.append({"path": rel, "reason": "設定ファイル(この版では解析対象外)"})
+            unanalyzed.append({"path": rel, "reason": M["config"]})
         elif ext in {".md", ".txt", ".json", ".lock", ".png", ".jpg", ".gitignore", ".html", ".css"} or p.name.startswith("."):
             continue  # 明示的に対象外(台帳にも載せない資料類)
         else:
-            unanalyzed.append({"path": rel, "reason": "この形式は未対応のため未解析"})
+            unanalyzed.append({"path": rel, "reason": M["unsupported"]})
     return analyzed, unanalyzed
 
 
-def machine_scan(files):
+def machine_scan(files, lang="ja"):
+    M = MSGS[lang]
     findings = []
     for f in files:
         for i, line in enumerate(f["text"].splitlines(), 1):
             if SECRET_RE.search(line):
                 findings.append({"file": f["path"], "line": i, "kind": "secret",
-                                 "severity": "critical", "note": "秘密の値(APIキー等)の直書きを検出"})
+                                 "severity": "critical", "note": M["secret"]})
             if SQL_CONCAT_RE.search(line):
                 findings.append({"file": f["path"], "line": i, "kind": "sql-concat",
-                                 "severity": "high", "note": "命令文の文字列連結を検出(不正な命令混入の恐れ)"})
+                                 "severity": "high", "note": M["sql"]})
             if LOG_PII_RE.search(line):
                 findings.append({"file": f["path"], "line": i, "kind": "log-pii",
-                                 "severity": "high", "note": "個人情報らしき値のログ出力を検出"})
+                                 "severity": "high", "note": M["pii"]})
             if DELETE_RE.search(line):
                 findings.append({"file": f["path"], "line": i, "kind": "delete",
-                                 "severity": "medium", "note": "削除系の操作を検出"})
+                                 "severity": "medium", "note": M["delete"]})
             for m in URL_RE.findall(line):
                 findings.append({"file": f["path"], "line": i, "kind": "external-url",
-                                 "severity": "info", "note": f"外部ホストへの参照: {m}"})
+                                 "severity": "info", "note": f"{M['url']}: {m}"})
     return findings
 
 
@@ -153,8 +182,15 @@ PROMPT_HEAD = """あなたは「コード通訳」——コードを読めない
 """
 
 
-def build_prompt(files, findings):
-    parts = [PROMPT_HEAD, "\n## 機械検査(簡易)の検出結果\n"]
+def build_prompt(files, findings, lang="ja"):
+    parts = [PROMPT_HEAD]
+    if lang == "en":
+        parts.append(
+            "\n## 出力言語の指定(最重要)\n"
+            "すべての出力テキスト(app_summary, file_roles, cards の title/body/learn_note, "
+            "line_translations の translation/marks, sections の heading/prose)を"
+            "**平易な英語(plain English)**で書くこと。読者は英語話者の非エンジニア。\n")
+    parts.append("\n## 機械検査(簡易)の検出結果\n")
     if findings:
         for f in findings:
             parts.append(f"- {f['file']}:{f['line']} [{f['kind']}/{f['severity']}] {f['note']}\n")
@@ -193,6 +229,7 @@ def main():
     ap.add_argument("--model", default="claude-sonnet-4-5")
     ap.add_argument("--out", default=None)
     ap.add_argument("--force", action="store_true", help="封印一致でも再翻訳する")
+    ap.add_argument("--lang", default="ja", choices=["ja", "en"], help="翻訳の出力言語")
     args = ap.parse_args()
 
     root = Path(args.target).expanduser().resolve()
@@ -201,11 +238,11 @@ def main():
     out_file = out_dir / "view-data.json"
 
     t0 = time.time()
-    analyzed, unanalyzed = collect_files(root)
+    analyzed, unanalyzed = collect_files(root, args.lang)
     if not analyzed:
         print("解析対象のコードファイルが見つかりません", file=sys.stderr)
         sys.exit(1)
-    findings = machine_scan(analyzed)
+    findings = machine_scan(analyzed, args.lang)
     git = git_info(root, [f["path"] for f in analyzed])
     seal = compute_seal(analyzed, git)
 
@@ -225,7 +262,7 @@ def main():
             print("変更なし(封印一致)。再翻訳をスキップしました。")
         return
 
-    prompt = build_prompt(analyzed, findings)
+    prompt = build_prompt(analyzed, findings, args.lang)
     ai, meta = call_claude(prompt, args.model)
 
     for f in analyzed:
@@ -233,6 +270,7 @@ def main():
             unanalyzed.append({"path": f["path"], "reason": "容量上限のため未解析"})
 
     data = {
+        "lang": args.lang,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "target": str(root),
         "project_name": root.name,
