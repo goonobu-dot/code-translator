@@ -31,6 +31,7 @@ MSGS = {
         "web_asset": "HTML/CSS/JSON類はこの版では解析対象外",
         "gap": "(AIの分割から漏れた行)",
         "gap_prose": "この数行はAIの自動分割に含まれませんでした。右のコードを直接確認してください。",
+        "ai_failed": "AI翻訳に失敗(もう一度実行すると直ることがあります)",
         "too_large": "ファイルが大きすぎるため未解析",
         "config": "設定ファイル(この版では解析対象外)",
         "unsupported": "この形式は未対応のため未解析",
@@ -48,6 +49,7 @@ MSGS = {
         "web_asset": "HTML/CSS/JSON files are not analyzed in this version",
         "gap": "(lines missed by the AI split)",
         "gap_prose": "These lines were not covered by the AI's split. Check the code on the right directly.",
+        "ai_failed": "AI translation failed (re-running often fixes this)",
         "too_large": "Skipped: file too large",
         "config": "Config file (not analyzed in this version)",
         "unsupported": "Skipped: unsupported file type",
@@ -199,8 +201,10 @@ PROMPT_HEAD = """あなたは「コード通訳」——コードを読めない
 - 機械検査の検出結果を下に添付する。対応するカードには必ずその内容を反映する。
 - 分からないこと・コードから読み取れないことは「コードからは確認できません」と書く。安心させる誇張をしない。
 - line_translations は各ファイルの全行(空行・閉じ括弧のみの行は省略可)。
-- sections は各ファイルを先頭から順に、2〜8行の「意味のまとまり」で漏れなく分割する
+- sections は各ファイルを先頭から順に「意味のまとまり」で**全行漏れなく**分割する
   (空行・閉じ括弧は前のまとまりに含める。まとまり同士は重複しない)。
+  大きさは基本2〜10行。ただし同種の繰り返し・宣言や設定値の羅列・UIレイアウトの列挙は
+  最大40行まで1まとまりにしてよい(細切れにする方が読みにくい)。
   見出しは「何をする数行か」を先に言い切る要約でよい。
 - flow は「このシステムを使うと何が起きるか」を利用者の体験順に3〜7歩の物語として語る。
   各歩は必ず実在するコード(file+lines)に根拠づける。技術用語でなく体験の言葉で。
@@ -235,33 +239,130 @@ def build_prompt(files, findings, lang="ja"):
 
 
 def call_claude(prompt, model):
+    """claude CLIを1回呼ぶ。失敗は分かりやすいメッセージのRuntimeErrorで返す。"""
     import shutil
     if not shutil.which("claude"):
-        print("エラー: Claude Code CLI(claudeコマンド)が見つかりません。\n"
-              "翻訳の生成に必要です。https://claude.com/claude-code からインストールし、"
-              "一度 `claude` を起動してログインしてから再実行してください。", file=sys.stderr)
-        sys.exit(2)
+        raise RuntimeError(
+            "Claude Code CLI(claudeコマンド)が見つかりません。翻訳の生成に必要です。\n"
+            "https://claude.com/claude-code からインストールし、一度 `claude` を起動して"
+            "ログインしてから再実行してください。")
     cmd = ["claude", "-p", prompt, "--output-format", "json", "--model", model]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     except subprocess.TimeoutExpired:
-        print("エラー: AI翻訳が時間内に完了しませんでした(10分)。ネットワークを確認して再実行してください。", file=sys.stderr)
-        sys.exit(2)
+        raise RuntimeError("AI翻訳が時間内に完了しませんでした(10分)。ネットワークを確認して再実行してください。")
     if r.returncode != 0:
-        print("エラー: AI翻訳の実行に失敗しました。`claude` に一度ログインできているか確認してください。\n"
-              f"詳細: {r.stderr[:300]}", file=sys.stderr)
-        sys.exit(2)
+        raise RuntimeError("AI翻訳の実行に失敗しました。`claude` に一度ログインできているか確認してください。\n"
+                           f"詳細: {r.stderr[:300]}")
     try:
         outer = json.loads(r.stdout)
         text = outer.get("result", "")
-        meta = {"cost_usd": outer.get("total_cost_usd"), "duration_ms": outer.get("duration_ms"), "model": model}
+        meta = {"cost_usd": outer.get("total_cost_usd") or 0, "duration_ms": outer.get("duration_ms"), "model": model}
         m = re.search(r"\{.*\}", text, re.S)
         if not m:
             raise ValueError("no json")
         return json.loads(m.group(0)), meta
     except (json.JSONDecodeError, ValueError):
-        print("エラー: AIの応答を読み取れませんでした(一時的な不調の可能性)。--force を付けて再実行してください。", file=sys.stderr)
-        sys.exit(2)
+        raise RuntimeError("AIの応答を読み取れませんでした(一時的な不調の可能性)。--force を付けて再実行してください。")
+
+
+FILE_PROMPT = """あなたは「コード通訳」——コードを読めない発注者のために、1つのソースファイルを翻訳する独立監査者です。以下の1ファイルだけを対象に、次のスキーマのJSONオブジェクト1個のみを出力してください(前後に文章・コードフェンス禁止)。
+
+{
+  "role": "このファイルの役割ひとこと(業務の言葉で)",
+  "sections": [
+    {"lines": "開始-終了", "heading": "一行見出し(20字以内・体言止め)", "prose": "何をするかの説明。業務の言葉で1〜3文、最大120字"}
+  ],
+  "cards": [
+    {"category": 1〜6, "lines": "開始-終了", "title": "見出し(20字以内)", "body": "事故につながり得る点の説明2〜3文", "severity": "high|medium|low", "learn_note": "読み方ヒント1〜2文"}
+  ],
+  "line_translations": [
+    {"line": 行番号, "translation": "その行の読み下し", "marks": "構文の目印(無ければ空文字)"}
+  ]
+}
+
+規律:
+- sections はこのファイルを先頭から**全行漏れなく**分割する(空行・閉じ括弧は前のまとまりに含める)。
+  大きさは基本2〜10行。同種の繰り返し・宣言や設定値の羅列・UIレイアウトの列挙は最大40行まで1まとまりでよい。
+- cards のカテゴリ: 1=外部への送信 2=高影響な操作(課金・削除・本番反映) 3=機密・個人データ 4=権限・認証 5=異常時の安全動作 6=依存・供給網。該当が無ければ空配列。
+- line_translations は cards の対象行(とその前後2行)だけでよい。
+- 分からないことは「コードからは確認できません」と書く。誇張しない。
+"""
+
+SUMMARY_PROMPT = """あなたは「コード通訳」です。以下は1つのシステムを構成するファイルの一覧と、各ファイルの内容の見出しです。これを読んで、次のスキーマのJSONオブジェクト1個のみを出力してください(前後に文章禁止)。
+
+{
+  "app_summary": "このシステム全体が何をするものかの平易な説明(2〜3文、業務の言葉で)",
+  "flow": [
+    {"text": "利用者の体験順に語る1歩(最大60字)", "file": "その歩を担うファイルパス", "lines": "開始-終了(見出しの行範囲から選ぶ)"}
+  ]
+}
+
+規律: flow は「このシステムを使うと何が起きるか」を利用者の体験順に3〜7歩の物語として語る。各歩は必ず一覧に実在する file と行範囲に根拠づける。技術用語でなく体験の言葉で。
+"""
+
+
+def analyze_per_file(analyzed, findings, args):
+    """ファイル1つずつAIに発注(4並列)。出力量の限界による分割の打ち切りを根本回避する。"""
+    from concurrent.futures import ThreadPoolExecutor
+    by_file = {}
+    for fd in findings:
+        by_file.setdefault(fd["file"], []).append(fd)
+
+    def work(f):
+        parts = [FILE_PROMPT]
+        if args.lang == "en":
+            parts.append("\n## 出力言語(最重要)\nすべての出力テキストを平易な英語で書くこと。\n")
+        fds = by_file.get(f["path"], [])
+        parts.append("\n## 機械検査(簡易)の検出結果\n" +
+                     ("".join(f"- {d['line']}行目 [{d['kind']}/{d['severity']}] {d['note']}\n" for d in fds) or "- 検出なし\n"))
+        parts.append(f"\n## 対象ファイル: {f['path']}\n```\n{numbered(f['text'])}\n```\n")
+        return f["path"], call_claude("".join(parts), args.model)
+
+    merged = {"file_roles": {}, "sections": [], "cards": [], "line_translations": []}
+    total_cost, failed = 0.0, []
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {ex.submit(work, f): f for f in analyzed}
+        for fut in list(futs):
+            f = futs[fut]
+            try:
+                path, (js, meta) = fut.result()
+            except RuntimeError as e:
+                print(f"  ! {f['path']}: {e}", file=sys.stderr)
+                failed.append(f["path"])
+                continue
+            total_cost += meta["cost_usd"] or 0
+            merged["file_roles"][path] = js.get("role", "")
+            for s in js.get("sections", []):
+                merged["sections"].append({**s, "file": path})
+            for c in js.get("cards", []):
+                merged["cards"].append({**c, "file": path})
+            for t in js.get("line_translations", []):
+                merged["line_translations"].append({**t, "file": path})
+    for i, c in enumerate(merged["cards"], 1):
+        c["id"] = f"c{i}"
+
+    # 全体要約と「処理の流れ」は、各ファイルの見出し一覧から別途1回で生成
+    outline = []
+    for path, role in merged["file_roles"].items():
+        outline.append(f"\n### {path} — {role}")
+        for s in merged["sections"]:
+            if s["file"] == path:
+                outline.append(f"- {s['lines']}: {s['heading']}")
+    sprompt = SUMMARY_PROMPT
+    if args.lang == "en":
+        sprompt += "\n## Output language\nWrite ALL output text in plain English.\n"
+    try:
+        summary, smeta = call_claude(sprompt + "\n## ファイル一覧と見出し\n" + "\n".join(outline), args.model)
+        total_cost += smeta["cost_usd"] or 0
+    except RuntimeError as e:
+        print(f"  ! 全体要約の生成に失敗: {e}", file=sys.stderr)
+        summary = {"app_summary": "", "flow": []}
+    merged["app_summary"] = summary.get("app_summary", "")
+    merged["flow"] = summary.get("flow", [])
+    meta = {"cost_usd": round(total_cost, 4), "duration_ms": None, "model": args.model,
+            "mode": f"per-file x{len(analyzed)}"}
+    return merged, meta, failed
 
 
 def main():
@@ -304,8 +405,24 @@ def main():
             print("変更なし(封印一致)。再翻訳をスキップしました。")
         return
 
-    prompt = build_prompt(analyzed, findings, args.lang)
-    ai, meta = call_claude(prompt, args.model)
+    total_lines = sum(len(f["text"].splitlines()) for f in analyzed)
+    try:
+        if total_lines <= 400:
+            ai, meta = call_claude(build_prompt(analyzed, findings, args.lang), args.model)
+        else:
+            print(f"ファイル別に翻訳します({len(analyzed)}ファイル・4並列)…")
+            ai, meta, failed = analyze_per_file(analyzed, findings, args)
+            if failed:
+                analyzed = [f for f in analyzed if f["path"] not in failed]
+                for p in failed:
+                    unanalyzed.append({"path": p, "reason": MSGS[args.lang]["ai_failed"]})
+                seal = compute_seal(analyzed, git)
+            if not analyzed:
+                print("エラー: すべてのファイルでAI翻訳に失敗しました。時間を置いて再実行してください。", file=sys.stderr)
+                sys.exit(2)
+    except RuntimeError as e:
+        print(f"エラー: {e}", file=sys.stderr)
+        sys.exit(2)
 
     for f in analyzed:
         if f.pop("truncated", False):
@@ -327,8 +444,9 @@ def main():
                 continue
             covered.update(range(int(m.group(1)), int(m.group(2) or m.group(1)) + 1))
         gap_start = None
+        trivial = re.compile(r"^[\s\}\)\];,]*$")  # 空行・閉じ括弧だけの行は翻訳不要
         for i in range(1, len(lines) + 2):
-            missing = i <= len(lines) and i not in covered and lines[i - 1].strip() != ""
+            missing = i <= len(lines) and i not in covered and not trivial.match(lines[i - 1])
             if missing and gap_start is None:
                 gap_start = i
             elif not missing and gap_start is not None:

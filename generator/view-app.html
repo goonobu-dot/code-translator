@@ -77,6 +77,12 @@
   .flow li .fa { font-size:10.5px; color:var(--muted); font-family:Menlo,monospace; margin-left:6px; }
   @keyframes ctflash { 0% { background:var(--warn-bg); } 100% { background:transparent; } }
   .sec.flash .sec-l { animation:ctflash 1.4s ease-out; }
+  .flow .play { font-family:inherit; font-size:11px; padding:1px 10px; border-radius:999px; border:1px solid var(--accent); background:var(--surface); color:var(--accent); cursor:pointer; margin-left:8px; }
+  #storybar { position:fixed; left:50%; transform:translateX(-50%); bottom:14px; z-index:8; background:var(--surface); border:1px solid var(--accent); border-radius:12px; padding:8px 14px; max-width:min(560px, 92vw); box-shadow:0 4px 18px rgba(0,0,0,.18); display:flex; gap:10px; align-items:center; font-size:12.5px; }
+  #storybar .tx { line-height:1.6; }
+  #storybar .no2 { font-size:10.5px; color:var(--muted); white-space:nowrap; }
+  #storybar button { font-family:inherit; font-size:11.5px; padding:2px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; white-space:nowrap; }
+  #storybar .nx { border-color:var(--accent); color:var(--accent); }
   .ctrl { margin-top:auto; padding-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; opacity:.55; transition:opacity .15s; }
   .sec:hover .ctrl, .sec:focus-within .ctrl { opacity:1; }
   .ctrl button { font-family:inherit; font-size:11.5px; padding:2px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); cursor:pointer; }
@@ -121,6 +127,7 @@
 </header>
 <div class="filebar" id="filebar"></div>
 <main id="main"></main>
+<div id="storybar" hidden></div>
 <div id="toast"></div>
 <script>
 const KW_ALL = {
@@ -157,6 +164,7 @@ const UI = {
     ansUk: "? わからないと回答済み(チャットで聞けば説明します)", undo: "取り消す",
     stOk: "✓ 確認済み", stNg: "✗ 要修正", stUk: "? 保留",
     flowLb: "何が起きるか(押すとそのコードへ)",
+    storyBtn: "▶ 順番に読む", storyPrev: "← 前へ", storyNext: "次へ →", storyDone: "おわり",
     guideShort: "使い方: 上のファイル名を押す → 説明を読む → ✓ / ✗ / ? を押す。✗とコメントはチャットで「たまった指摘を直して」と言えばAIが対応。",
     cmtOpen: "コメントを書く", cmtPh: "例: ここは確認画面を挟んでほしい", save: "保存",
     yourCmt: "あなたのコメント", edit: "編集",
@@ -185,6 +193,7 @@ const UI = {
     ansUk: "? Marked unsure (ask in chat for an explanation)", undo: "Undo",
     stOk: "✓ Reviewed", stNg: "✗ Flagged", stUk: "? On hold",
     flowLb: "What happens (click to jump to the code)",
+    storyBtn: "▶ Read in order", storyPrev: "← Back", storyNext: "Next →", storyDone: "Done",
     guideShort: 'How to: press a file name above → read each unit → press ✓ / ✗ / ?. ✗ answers and comments are fixed when you say "fix the flagged items" in chat.',
     cmtOpen: "Write a comment", cmtPh: "e.g. add a confirmation screen before sending", save: "Save",
     yourCmt: "Your comment", edit: "Edit",
@@ -255,6 +264,22 @@ function jumpFlow(i) {
   const st = (DATA.flow || [])[i];
   if (!st || !st.file) return;
   jumpToLine(st.file, parseInt(String(st.lines).split("-")[0]) || 1);
+}
+let storyIdx = -1;
+function startStory() { storyIdx = 0; showStory(); }
+function stepStory(d) { storyIdx += d; showStory(); }
+function endStory() { storyIdx = -1; $("storybar").hidden = true; }
+function showStory() {
+  const flow = DATA.flow || [];
+  if (storyIdx < 0 || storyIdx >= flow.length) return endStory();
+  const st = flow[storyIdx];
+  $("storybar").hidden = false;
+  $("storybar").innerHTML =
+    `<span class="no2">${storyIdx + 1}/${flow.length}</span><span class="tx">${esc(st.text)}</span>` +
+    `<button onclick="stepStory(-1)" ${storyIdx === 0 ? "disabled" : ""}>${L.storyPrev}</button>` +
+    `<button class="nx" onclick="stepStory(1)">${storyIdx === flow.length - 1 ? L.storyDone : L.storyNext}</button>` +
+    `<button onclick="endStory()">✕</button>`;
+  jumpFlow(storyIdx);
 }
 let VEIL = localStorage.getItem("ct-veil") === "1";
 const $ = id => document.getElementById(id);
@@ -344,7 +369,7 @@ function render() {
   }
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
   if (d.flow && d.flow.length) {
-    h += `<div class="flow"><span class="lb">${L.flowLb}</span><ol>` +
+    h += `<div class="flow"><span class="lb">${L.flowLb}</span><button class="play" onclick="startStory()">${L.storyBtn}</button><ol>` +
       d.flow.map((st, i) => `<li onclick="jumpFlow(${i})">${esc(st.text)}<span class="fa">${esc(st.file || "")}${st.lines ? ":" + esc(String(st.lines)) : ""}</span></li>`).join("") +
       `</ol></div>`;
   }
