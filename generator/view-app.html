@@ -67,6 +67,16 @@
   .ln .no { width:32px; color:#5C666D; flex-shrink:0; user-select:none; }
   .kw { border-bottom:1px dotted #7BA8C4; cursor:help; }
   .c-com { color:#8A99A3; } .c-str { color:#E8B36A; } .c-key { color:#8FBFE8; }
+  .ref { border-bottom:1px dashed #6BC5A8; cursor:pointer; }
+  .ref:hover { color:#8FE3C6; }
+  .flow { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:9px 14px 7px; margin-bottom:10px; font-size:13px; }
+  .flow .lb { font-size:10.5px; font-weight:700; color:var(--accent); letter-spacing:.08em; }
+  .flow ol { margin:4px 0 4px; padding-left:1.5em; }
+  .flow li { margin-bottom:2px; cursor:pointer; }
+  .flow li:hover { color:var(--accent); }
+  .flow li .fa { font-size:10.5px; color:var(--muted); font-family:Menlo,monospace; margin-left:6px; }
+  @keyframes ctflash { 0% { background:var(--warn-bg); } 100% { background:transparent; } }
+  .sec.flash .sec-l { animation:ctflash 1.4s ease-out; }
   .ctrl { margin-top:auto; padding-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; opacity:.55; transition:opacity .15s; }
   .sec:hover .ctrl, .sec:focus-within .ctrl { opacity:1; }
   .ctrl button { font-family:inherit; font-size:11.5px; padding:2px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); cursor:pointer; }
@@ -107,6 +117,7 @@
   <span class="badge b-warn" id="bCover"></span>
   <button class="hbtn" id="tVeil"></button>
   <button class="hbtn" id="tTheme" title="配色の切替"></button>
+  <span id="ctxbar" style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36ch"></span>
 </header>
 <div class="filebar" id="filebar"></div>
 <main id="main"></main>
@@ -145,6 +156,7 @@ const UI = {
     ansOk: "✓ 問題ないと回答済み", ansNg: "✗ おかしいと回答済み(チャットで「たまった指摘を直して」)",
     ansUk: "? わからないと回答済み(チャットで聞けば説明します)", undo: "取り消す",
     stOk: "✓ 確認済み", stNg: "✗ 要修正", stUk: "? 保留",
+    flowLb: "何が起きるか(押すとそのコードへ)",
     guideShort: "使い方: 上のファイル名を押す → 説明を読む → ✓ / ✗ / ? を押す。✗とコメントはチャットで「たまった指摘を直して」と言えばAIが対応。",
     cmtOpen: "コメントを書く", cmtPh: "例: ここは確認画面を挟んでほしい", save: "保存",
     yourCmt: "あなたのコメント", edit: "編集",
@@ -172,6 +184,7 @@ const UI = {
     ansOk: "✓ Marked as fine", ansNg: '✗ Marked wrong (say "fix the flagged items" in chat)',
     ansUk: "? Marked unsure (ask in chat for an explanation)", undo: "Undo",
     stOk: "✓ Reviewed", stNg: "✗ Flagged", stUk: "? On hold",
+    flowLb: "What happens (click to jump to the code)",
     guideShort: 'How to: press a file name above → read each unit → press ✓ / ✗ / ?. ✗ answers and comments are fixed when you say "fix the flagged items" in chat.',
     cmtOpen: "Write a comment", cmtPh: "e.g. add a confirmation screen before sending", save: "Save",
     yourCmt: "Your comment", edit: "Edit",
@@ -198,7 +211,51 @@ function setLang() {
   $("appTitle").textContent = lg === "en" ? "📖 Code Interpreter" : "📖 コード通訳";
 }
 let DATA = null, REVIEW = {}, generatedAt = null, canPost = true, activeFile = "__all__";
-let SECKEYS = [], FILEKEYS = [];
+let SECKEYS = [], FILEKEYS = [], SECMETA = [], DEFS = {}, REFRE = null;
+const DEF_RE = /(?:\bfunction\s+|\bfunc\s+|\bdef\s+|\bclass\s+|\bstruct\s+|\bconst\s+)([A-Za-z_][A-Za-z0-9_]{2,})/;
+function buildDefs() {
+  DEFS = {};
+  for (const f of DATA.files) {
+    f.lines.forEach((line, i) => {
+      const m = line.match(DEF_RE);
+      if (m && !DEFS[m[1]]) DEFS[m[1]] = { file: f.path, line: i + 1 };
+    });
+  }
+  const names = Object.keys(DEFS).sort((a, b) => b.length - a.length);
+  REFRE = names.length ? new RegExp("\\b(" + names.join("|") + ")\\b(?![^<]*>)", "g") : null;
+}
+function inRange(spec, n) {
+  const m = String(spec).split("-").map(Number);
+  return n >= m[0] && n <= (m[1] || m[0]);
+}
+function defHeading(name) {
+  const d = DEFS[name];
+  const s = (DATA.sections || []).find(x => x.file === d.file && inRange(x.lines, d.line));
+  return s ? s.heading : d.file;
+}
+function jumpToLine(file, line) {
+  if (activeFile !== "__all__" && activeFile !== file) {
+    activeFile = file;
+    render();
+  }
+  const ki = SECMETA.findIndex(m => m && m.file === file && m.a <= line && line <= m.b);
+  const el = ki >= 0 ? $("s" + ki) : null;
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+  }
+}
+function jumpRef(name) {
+  const d = DEFS[name];
+  if (d) jumpToLine(d.file, d.line);
+}
+function jumpFlow(i) {
+  const st = (DATA.flow || [])[i];
+  if (!st || !st.file) return;
+  jumpToLine(st.file, parseInt(String(st.lines).split("-")[0]) || 1);
+}
 let VEIL = localStorage.getItem("ct-veil") === "1";
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
@@ -235,13 +292,20 @@ function parseLines(spec) {
   });
   return out;
 }
-function hlLine(raw) {
+function hlLine(raw, file, n) {
   let s = esc(raw), comment = "";
   const ci = s.indexOf("//");
   if (ci >= 0) { comment = `<span class="c-com">${s.slice(ci)}</span>`; s = s.slice(0, ci); }
   s = s.replace(/(&quot;[^&]*?&quot;|'[^']*'|`[^`]*`)/g, '<span class="c-str">$1</span>');
   s = s.replace(/\b(function|const|let|var|if|else|return|await|async|require|for|while|try|catch|throw|new|process)\b/g,
     m => KW[m] ? `<span class="c-key kw" title="${m} = ${KW[m]}">${m}</span>` : `<span class="c-key">${m}</span>`);
+  if (REFRE) {
+    s = s.replace(REFRE, name => {
+      const d = DEFS[name];
+      if (!d || (d.file === file && d.line === n)) return name;
+      return `<span class="ref" title="→ ${esc(defHeading(name))}" onclick="event.stopPropagation();jumpRef('${name}')">${name}</span>`;
+    });
+  }
   return (s + comment) || " ";
 }
 
@@ -279,6 +343,11 @@ function render() {
     h += `<div class="guide"><span>${L.guideShort}</span><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
   }
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
+  if (d.flow && d.flow.length) {
+    h += `<div class="flow"><span class="lb">${L.flowLb}</span><ol>` +
+      d.flow.map((st, i) => `<li onclick="jumpFlow(${i})">${esc(st.text)}<span class="fa">${esc(st.file || "")}${st.lines ? ":" + esc(String(st.lines)) : ""}</span></li>`).join("") +
+      `</ol></div>`;
+  }
 
   let impCount = 0;
   for (const f of d.files) {
@@ -300,10 +369,11 @@ function render() {
       for (const n of lines) {
         if (n > f.lines.length) break;
         const t = ltMap[n];
-        code += `<div class="ln"${t ? ` title="${esc(t.translation)}"` : ""}><span class="no">${n}</span><span>${hlLine(f.lines[n - 1] || "")}</span></div>`;
+        code += `<div class="ln"${t ? ` title="${esc(t.translation)}"` : ""}><span class="no">${n}</span><span>${hlLine(f.lines[n - 1] || "", f.path, n)}</span></div>`;
       }
       const border = st.v === "ok" ? " done-ok" : (st.v === "ng" || st.v === "uk") ? " done-ng" : "";
-      h += `<div class="sec${imp ? " imp" : ""}${border}${veiled ? " veiled" : ""}" id="sec-${esc(k).replace(/[^a-zA-Z0-9]/g, "_")}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
+      SECMETA[ki] = { file: f.path, a: lines[0], b: lines[lines.length - 1] };
+      h += `<div class="sec${imp ? " imp" : ""}${border}${veiled ? " veiled" : ""}" id="s${ki}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
         <div class="sec-l">
           <div class="sec-h">${imp ? `<span class="impb">${L.caution}</span>` : ""}${esc(s.heading)}<span class="sec-a">${L.lines(esc(String(s.lines)))}</span></div>
           <div class="sec-p">${esc(s.prose)}</div>
@@ -395,6 +465,7 @@ async function load(first) {
       canPost = false;
       try { REVIEW = JSON.parse(localStorage.getItem("ct-review")) || {}; } catch { REVIEW = {}; }
       setLang();
+      buildDefs();
       document.title = (DATA.lang === "en" ? "Code Interpreter — " : "コード通訳 — ") + DATA.project_name;
       applyTheme();
       render();
@@ -412,6 +483,7 @@ async function load(first) {
         REVIEW = rr.ok ? await rr.json() : {};
       } catch { REVIEW = {}; }
       setLang();
+      buildDefs();
       document.title = (DATA.lang === "en" ? "Code Interpreter — " : "コード通訳 — ") + d.project_name;
       applyTheme();
       render();
@@ -421,6 +493,30 @@ async function load(first) {
     if (first) $("main").innerHTML = `<p style="color:var(--crit-fg);padding:16px">${L.noData}</p>`;
   }
 }
+let ctxTick = false;
+window.addEventListener("scroll", () => {
+  if (ctxTick) return;
+  ctxTick = true;
+  requestAnimationFrame(() => {
+    ctxTick = false;
+    if (!SECMETA.length) return;
+    let label = "";
+    for (let i = 0; i < SECMETA.length; i++) {
+      const el = $("s" + i);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      const vh = window.innerHeight || document.documentElement.clientHeight || 800;
+      if (r.bottom > 60 && r.top < vh) {
+        const m = SECMETA[i];
+        const s = (DATA.sections || []).find(x => x.file === m.file && inRange(x.lines, m.a));
+        label = "📍 " + m.file + (s ? " › " + s.heading : "");
+        break;
+      }
+    }
+    $("ctxbar").textContent = label;
+  });
+}, { passive: true });
+
 applyTheme();
 load(true);
 setInterval(() => load(false), 4000);
