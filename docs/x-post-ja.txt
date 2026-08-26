@@ -113,5 +113,3 @@ GitHub: https://github.com/goonobu-dot/code-translator
 使い方(5分・画像つき手順書): https://github.com/goonobu-dot/code-translator/blob/main/docs/manual.md
 
 #バイブコーディング #ClaudeCode #個人開発
-
-──────────
