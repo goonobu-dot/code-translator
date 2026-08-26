@@ -38,6 +38,18 @@
   .filebar .lbl { font-size:11px; color:var(--muted); }
   .fbtn { font-family:Menlo,monospace; font-size:11.5px; padding:3px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
   .fsel { font-family:Menlo,monospace; font-size:11.5px; padding:3px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; max-width:min(52ch, 70vw); }
+  /* 進み具合の帯: 四角1つ=1ファイル(緑=確認済み / 黄=途中 / 灰=未着手 / 赤枠=重大あり) */
+  .fmap { display:inline-flex; gap:3px; flex-wrap:wrap; align-items:center; margin-left:4px; }
+  .fsq { width:11px; height:11px; border-radius:3px; cursor:pointer; display:inline-block; border:1px solid transparent; }
+  .fsq.fdone { background:var(--ok-fg); }
+  .fsq.fpart { background:var(--warn-fg); }
+  .fsq.ftodo { background:var(--line); }
+  .fsq.fred { border-color:var(--crit-fg); }
+  .fsq.fon { outline:2px solid var(--accent); outline-offset:1px; }
+  .fsq:hover { transform:scale(1.25); }
+  /* ファイルボタン(少数のとき)も同じ色分けにする */
+  .fbtn.fdone { border-color:var(--ok-fg); }
+  .fbtn.fpart { border-color:var(--warn-fg); }
   .fbtn.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
   .fbtn .fd { font-family:"Hiragino Kaku Gothic ProN",sans-serif; font-size:11px; margin-left:6px; }
   .fbtn .fd.ok { color:var(--ok-fg); } .fbtn.on .fd.ok { color:inherit; }
@@ -203,6 +215,8 @@ const UI = {
     crumbIn: "の中",
     shareNote: "📄 これは共有・保存用のページです。✓✗?の回答はこの端末の中だけに残り、AIには渡りません。指摘をAIに直させたいときは、チャットで「翻訳を開いて」と言ってブラウザ版を使ってください。",
     filesLeft: (a, b) => `未確認 ${a} / ${b} ファイル`,
+    fdone: "確認済み",
+    fmapHint: "(■確認済み ■途中 ■未着手 / 赤枠=重大あり・押すと開く)",
     guideShort: "使い方: 上のファイル名を押す → 説明を読む → ✓ / ✗ / ? を押す。✗とコメントはチャットで「たまった指摘を直して」と言えばAIが対応。",
     cmtOpen: "コメントを書く", cmtPh: "例: ここは確認画面を挟んでほしい", save: "保存",
     yourCmt: "あなたのコメント", edit: "編集",
@@ -251,6 +265,8 @@ const UI = {
     crumbIn: "— inside this",
     shareNote: "📄 This is the shareable copy. Your ✓/✗/? answers stay in this browser only and never reach the AI. To have the AI fix what you flag, ask in chat to open the translation and use the browser version.",
     filesLeft: (a, b) => `${a} of ${b} files left`,
+    fdone: "reviewed",
+    fmapHint: "(■done ■partial ■not started / red outline = serious · click to open)",
     guideShort: 'How to: press a file name above → read each unit → press ✓ / ✗ / ?. ✗ answers and comments are fixed when you say "fix the flagged items" in chat.',
     cmtOpen: "Write a comment", cmtPh: "e.g. add a confirmation screen before sending", save: "Save",
     yourCmt: "Your comment", edit: "Edit",
@@ -532,6 +548,13 @@ function render() {
   SECKEYS = [];
   FILEKEYS = d.files.map(f => f.path);
   const remOf = f => secs.filter(s => s.file === f.path && !(rv[secKey(s)] || {}).v).length;
+  // ファイルごとの進み具合を色で示すための状態(済み / 途中 / 未着手、赤の有無)
+  const stateOf = f => {
+    const all = secs.filter(s => s.file === f.path).length;
+    const rem = remOf(f);
+    const red = d.cards.some(c => c.file === f.path && riskOf([c]) === 3);
+    return { all, rem, red, cls: rem === 0 && all ? "fdone" : rem < all ? "fpart" : "ftodo" };
+  };
   const fb = [`<span class="lbl">${L.pick}</span>`];
   if (d.files.length > 6) {
     // ファイルが多いときは1行の選択メニューにまとめる(ボタンの帯で画面を埋めない)
@@ -543,11 +566,16 @@ function render() {
     fb.push(`<select class="fsel" onchange="setFile(parseInt(this.value))">${opts.join("")}</select>`);
     const left = d.files.filter(f => remOf(f) > 0).length;
     fb.push(`<span class="lbl">${L.filesLeft(left, d.files.length)}</span>`);
+    // 進み具合の帯: ファイル1つを小さな四角で表す(緑=確認済み / 黄=途中 / 灰=未着手、赤枠=重大あり)
+    fb.push(`<span class="fmap">` + d.files.map((f, fi) => {
+      const st = stateOf(f);
+      return `<i class="fsq ${st.cls}${st.red ? " fred" : ""}${activeFile === f.path ? " fon" : ""}" title="${esc(f.path)} — ${st.rem ? L.fleft(st.rem) : L.fdone}${st.red ? " / " + L.risk[3] : ""}" onclick="setFile(${fi})"></i>`;
+    }).join("") + `</span><span class="lbl" style="margin-left:2px">${L.fmapHint}</span>`);
   } else {
     fb.push(`<button class="fbtn${activeFile === "__all__" ? " on" : ""}" onclick="setFile(-1)">${L.all}</button>`);
     d.files.forEach((f, fi) => {
-      const rem = remOf(f);
-      fb.push(`<button class="fbtn${activeFile === f.path ? " on" : ""}" onclick="setFile(${fi})">${esc(f.path)}<span class="fd ${rem ? "warn" : "ok"}">${rem ? L.fleft(rem) : "✓"}</span></button>`);
+      const st = stateOf(f);
+      fb.push(`<button class="fbtn ${st.cls}${activeFile === f.path ? " on" : ""}" onclick="setFile(${fi})">${st.red ? "🔴 " : ""}${esc(f.path)}<span class="fd ${st.rem ? "warn" : "ok"}">${st.rem ? L.fleft(st.rem) : "✓"}</span></button>`);
     });
   }
   $("filebar").innerHTML = fb.join("");
