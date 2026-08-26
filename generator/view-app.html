@@ -59,6 +59,17 @@
   .sec + .sec .sec-l { border-top:1px solid var(--line); }
   .sec:hover .sec-r { background:#262E34; }
   .sec.flash .sec-r { background:#2B3440; }
+  /* 危険度の色分け: 赤=事故につながる / 橙=要確認 / 青=知っておく / 無色=ふつうの処理 */
+  .sec.r3 .sec-l { box-shadow:inset 4px 0 0 var(--crit-fg); background:color-mix(in srgb, var(--crit-bg) 45%, transparent); }
+  .sec.r2 .sec-l { box-shadow:inset 4px 0 0 var(--warn-fg); background:color-mix(in srgb, var(--warn-bg) 35%, transparent); }
+  .sec.r1 .sec-l { box-shadow:inset 4px 0 0 #4A7FA5; }
+  .rchip { font-size:10px; font-weight:700; border-radius:999px; padding:0 7px; white-space:nowrap; }
+  .rchip.r3 { background:var(--crit-bg); color:var(--crit-fg); }
+  .rchip.r2 { background:var(--warn-bg); color:var(--warn-fg); }
+  .rchip.r1 { background:var(--soft); color:#4A7FA5; }
+  .legend { display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-bottom:10px; }
+  .legend b { font-weight:700; }
+  .legend .sw { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; vertical-align:middle; }
   .sec.imp .sec-l { box-shadow:inset 3px 0 0 var(--warn-fg); }
   .sec.done-ok .sec-l { box-shadow:inset 3px 0 0 var(--ok-fg); }
   .sec.done-ng .sec-l { box-shadow:inset 3px 0 0 var(--crit-fg); }
@@ -200,6 +211,11 @@ const UI = {
     note: (t, c) => `生成: ${t} / コードが変わると画面と回答は自動で新しい版に切り替わります。コードの行にマウスを乗せると1行ずつの訳が出ます。${c ? ` / コメント ${c}件` : ""}`,
     warp: n => `⚠ 次の注意箇所へ (${n})`, mechNone: "この箇所への機械検出はなし(AIの読み取りのみ——断定はしていません)",
     sendFix: n => `📮 指摘をAIへ送る (${n})`,
+    risk: { 3: "🔴 重大", 2: "🟠 要確認", 1: "🔵 知っておく" },
+    cat: { 1: "外部への送信", 2: "課金・削除など", 3: "個人情報", 4: "権限・認証", 5: "異常時の動作", 6: "外部の部品" },
+    legendLb: "色の意味:",
+    legend3: "事故につながりうる(お金・削除・情報漏れ)", legend2: "内容を確かめたい", legend1: "知っておくとよい", legend0: "ふつうの処理",
+    onlyRisk: "🔴 危ない所だけ", onlyRiskOff: "すべて表示",
     fixMsgHead: "コード通訳で気になった箇所です。内容を確認して直してください。",
     fixMsgTail: "(この一覧は翻訳画面の回答から作られています。直したら翻訳も更新してください)",
     fixCopied: "コピーしました。チャットに貼り付けて送ってください",
@@ -239,6 +255,11 @@ const UI = {
     note: (t, c) => `Generated: ${t} / The page and answers switch automatically when the code changes. Hover a code line for its line-by-line translation.${c ? ` / Comments: ${c}` : ""}`,
     warp: n => `⚠ Next caution spot (${n})`, mechNone: "No automated detection here (AI reading only — not a guarantee)",
     sendFix: n => `📮 Send flags to the AI (${n})`,
+    risk: { 3: "🔴 Serious", 2: "🟠 Check this", 1: "🔵 Good to know" },
+    cat: { 1: "sends data out", 2: "charges / deletes", 3: "personal data", 4: "permissions", 5: "failure handling", 6: "outside parts" },
+    legendLb: "Colors:",
+    legend3: "could cause real harm (money, deletion, leaks)", legend2: "worth confirming", legend1: "good to know", legend0: "ordinary code",
+    onlyRisk: "🔴 Risky parts only", onlyRiskOff: "Show all",
     fixMsgHead: "These are the spots I flagged in the Code Interpreter. Please review and fix them.",
     fixMsgTail: "(This list comes from my answers in the translation view. After fixing, please refresh the translation.)",
     fixCopied: "Copied — paste it into chat and send",
@@ -308,6 +329,18 @@ function jumpRef(name) {
   const d = DEFS[name];
   if (d) jumpToLine(d.file, d.line);
 }
+// 注意カードから「危険度」を決める。外部送信・削除課金・個人情報は一段重く見る
+const RISK_CATS = { 1: true, 2: true, 3: true };   // 1=外部送信 2=高影響な操作 3=機密データ
+function riskOf(cards) {
+  if (!cards.length) return 0;
+  let lv = 0;
+  for (const c of cards) {
+    const sev = c.severity === "high" ? 3 : c.severity === "medium" ? 2 : 1;
+    const heavy = RISK_CATS[c.category];
+    lv = Math.max(lv, sev === 3 ? 3 : heavy && sev === 2 ? 3 : sev === 2 ? 2 : heavy ? 2 : 1);
+  }
+  return lv;
+}
 function scopeChain(f, startLine) {
   // この数行を包んでいる関数・クラス名を、インデントを頼りに外側へたどる(最大2階層)
   const lines = f.lines || [];
@@ -370,6 +403,8 @@ function lsGet(k) { try { const v = localStorage.getItem(k); return v === null ?
 function lsSet(k, v) { MEM[k] = v; try { localStorage.setItem(k, v); } catch {} }
 
 let VEIL = lsGet("ct-veil") === "1";
+let ONLY_RISK = false;  // 危ない所だけに絞って読むモード
+function toggleRisk() { ONLY_RISK = !ONLY_RISK; render(); window.scrollTo({ top: 0 }); }
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const secKey = s => s.file + "|" + s.lines + "|" + s.heading;
@@ -468,6 +503,10 @@ function render() {
     h += `<div class="guide"><span>${L.guideShort}</span><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
   }
   if (!canPost && !ARTIFACT_API) h += `<div class="guide"><span>${L.shareNote}</span></div>`;
+  h += `<div class="legend"><span>${L.legendLb}</span>` +
+    [3, 2, 1].map(n => `<span><span class="sw" style="background:${n === 3 ? "var(--crit-fg)" : n === 2 ? "var(--warn-fg)" : "#4A7FA5"}"></span><b>${L.risk[n]}</b> ${n === 3 ? L.legend3 : n === 2 ? L.legend2 : L.legend1}</span>`).join("") +
+    `<span><span class="sw" style="background:var(--line)"></span>${L.legend0}</span>` +
+    `<button class="hbtn${ONLY_RISK ? " on" : ""}" style="margin-left:auto" onclick="toggleRisk()">${ONLY_RISK ? L.onlyRiskOff : L.onlyRisk}</button></div>`;
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
   if (d.flow && d.flow.length) {
     h += `<div class="flow"><span class="lb">${L.flowLb}</span><button class="play" onclick="startStory()">${L.storyBtn}</button><ol>` +
@@ -476,6 +515,7 @@ function render() {
   }
 
   let impCount = 0;
+  const riskCount = {};
   for (const f of d.files) {
     if (activeFile !== "__all__" && f.path !== activeFile) continue;
     const fsecs = secs.filter(s => s.file === f.path);
@@ -500,6 +540,9 @@ function render() {
       const secCards = d.cards.filter(c => c.file === f.path && parseLines(c.lines).some(n => lines.includes(n)));
       const imp = secCards.length > 0;
       if (imp) impCount++;
+      const rlv = riskOf(secCards);
+      if (rlv) riskCount[rlv] = (riskCount[rlv] || 0) + 1;
+      if (ONLY_RISK && rlv < 2) return;  // 絞り込み中は「重大」「要確認」だけ出す
       const veiled = VEIL && !imp && !st.v;
       let code = "";
       for (const n of lines) {
@@ -509,9 +552,9 @@ function render() {
       }
       const border = st.v === "ok" ? " done-ok" : (st.v === "ng" || st.v === "uk") ? " done-ng" : "";
       SECMETA[ki] = { file: f.path, a: lines[0], b: lines[lines.length - 1] };
-      h += `<div class="sec${imp ? " imp" : ""}${border}${veiled ? " veiled" : ""}" id="s${ki}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
+      h += `<div class="sec${rlv ? " r" + rlv : ""}${border}${veiled ? " veiled" : ""}" id="s${ki}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
         <div class="sec-l"><div class="lwrap">
-          <div class="sec-h">${imp ? `<span class="impb">${L.caution}</span>` : ""}${esc(s.heading)}<span class="sec-a">${L.lines(esc(String(s.lines)))}</span></div>
+          <div class="sec-h">${rlv ? `<span class="rchip r${rlv}">${L.risk[rlv]}${secCards[0] ? " " + L.cat[secCards[0].category] : ""}</span>` : ""}${esc(s.heading)}<span class="sec-a">${L.lines(esc(String(s.lines)))}</span></div>
           ${(() => {
             const ch = scopeChain(f, lines[0]);
             return ch.length ? `<div class="crumb">📦 ${ch.map(n => `<span class="cn" onclick="event.stopPropagation();jumpRef('${n}')">${esc(n)}</span>`).join(" › ")} ${L.crumbIn}</div>` : "";
