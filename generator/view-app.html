@@ -126,7 +126,11 @@
   .sev { font-size:10.5px; font-weight:700; padding:0 6px; border-radius:4px; margin-right:4px; background:var(--warn-bg); color:var(--warn-fg); }
   .sev-critical { background:var(--crit-bg); color:var(--crit-fg); }
   .warp { position:fixed; bottom:16px; right:16px; z-index:6; font-family:inherit; font-size:12.5px; padding:8px 16px; border-radius:999px; border:1px solid var(--warn-fg); background:var(--warn-bg); color:var(--warn-fg); cursor:pointer; }
-  #toast { position:fixed; bottom:16px; left:16px; background:var(--ink); color:var(--bg); padding:8px 16px; border-radius:8px; font-size:12.5px; opacity:0; transition:opacity .3s; pointer-events:none; }
+  /* 書いた指摘をAIへ戻すボタン(指摘があるときだけ出る) */
+  .sendfix { position:fixed; bottom:16px; left:16px; z-index:7; font-family:inherit; font-size:12.5px; font-weight:700; padding:8px 16px; border-radius:999px; border:none; background:var(--accent); color:var(--bg); cursor:pointer; box-shadow:0 3px 14px rgba(0,0,0,.22); }
+  body.storying .sendfix { display:none; }
+  /* 浮きボタン(左下=指摘送信・右下=注意箇所)と重ならないよう、通知はその上に出す */
+  #toast { position:fixed; bottom:62px; left:16px; z-index:9; background:var(--ink); color:var(--bg); padding:8px 16px; border-radius:8px; font-size:12.5px; opacity:0; transition:opacity .3s; pointer-events:none; box-shadow:0 3px 14px rgba(0,0,0,.25); }
   .note { font-size:12px; color:var(--muted); margin-top:14px; }
   @media (max-width:700px) { .sec { grid-template-columns:1fr; } }
 </style>
@@ -195,6 +199,13 @@ const UI = {
     findings: n => `自動チェックの記録(参考・${n}件)`,
     note: (t, c) => `生成: ${t} / コードが変わると画面と回答は自動で新しい版に切り替わります。コードの行にマウスを乗せると1行ずつの訳が出ます。${c ? ` / コメント ${c}件` : ""}`,
     warp: n => `⚠ 次の注意箇所へ (${n})`, mechNone: "この箇所への機械検出はなし(AIの読み取りのみ——断定はしていません)",
+    sendFix: n => `📮 指摘をAIへ送る (${n})`,
+    fixMsgHead: "コード通訳で気になった箇所です。内容を確認して直してください。",
+    fixMsgTail: "(この一覧は翻訳画面の回答から作られています。直したら翻訳も更新してください)",
+    fixCopied: "コピーしました。チャットに貼り付けて送ってください",
+    sentToAI: "AIに送りました。チャットで「指摘を直して」と言えば対応します",
+    sendFail: "送信できませんでした。もう一度押すか、チャットで「たまった指摘を直して」と言ってください",
+    fixCopyFail: "コピーできませんでした。チャットで「たまった指摘を直して」と言ってください",
     mech: "自動チェック", toastUpd: "翻訳が更新されました", toastLocal: "この画面では回答はこの端末にのみ保存されます",
     noData: "まだ翻訳データがありません。チャットで「コードを翻訳して」と言ってください。",
   },
@@ -227,6 +238,13 @@ const UI = {
     findings: n => `Automated check log (reference, ${n})`,
     note: (t, c) => `Generated: ${t} / The page and answers switch automatically when the code changes. Hover a code line for its line-by-line translation.${c ? ` / Comments: ${c}` : ""}`,
     warp: n => `⚠ Next caution spot (${n})`, mechNone: "No automated detection here (AI reading only — not a guarantee)",
+    sendFix: n => `📮 Send flags to the AI (${n})`,
+    fixMsgHead: "These are the spots I flagged in the Code Interpreter. Please review and fix them.",
+    fixMsgTail: "(This list comes from my answers in the translation view. After fixing, please refresh the translation.)",
+    fixCopied: "Copied — paste it into chat and send",
+    sentToAI: "Sent to the AI. Say “fix the flagged items” in chat and it will act on them",
+    sendFail: "Could not send. Press again, or ask in chat to fix the flagged items",
+    fixCopyFail: "Copy failed. Ask in chat to fix the flagged items instead",
     mech: "Automated check", toastUpd: "Translation updated", toastLocal: "On this page, answers are saved on this device only",
     noData: 'No translation data yet. Ask in chat to translate the code.',
   },
@@ -241,6 +259,15 @@ function setLang() {
   $("appTitle").textContent = lg === "en" ? "📖 Code Interpreter" : "📖 コード通訳";
 }
 let DATA = null, REVIEW = {}, generatedAt = null, canPost = true, activeFile = "__all__";
+// 共有ページ版が自分自身に回答を保存し直すための素材(描画前の骨格・見た目・プログラム本体)
+const APP_SRC = document.currentScript ? document.currentScript.textContent : "";
+const STYLE_SRC = (document.querySelector("style") || {}).textContent || "";
+const BODY_SHELL = (() => {
+  const c = document.body.cloneNode(true);
+  c.querySelectorAll("script").forEach(s => s.remove());
+  return c.innerHTML;
+})();
+let ARTIFACT_API = null;  // ページ自身を保存できる環境かどうか(共有ページ版のみ)
 let SECKEYS = [], FILEKEYS = [], SECMETA = [], DEFS = {}, REFRE = null;
 const DEF_RE = /(?:\bfunction\s+|\bfunc\s+|\bdef\s+|\bclass\s+|\bstruct\s+|\bconst\s+)([A-Za-z_][A-Za-z0-9_]{2,})/;
 function buildDefs() {
@@ -440,7 +467,7 @@ function render() {
   if (!lsGet("ct-guide-hide")) {
     h += `<div class="guide"><span>${L.guideShort}</span><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
   }
-  if (!canPost) h += `<div class="guide"><span>${L.shareNote}</span></div>`;
+  if (!canPost && !ARTIFACT_API) h += `<div class="guide"><span>${L.shareNote}</span></div>`;
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
   if (d.flow && d.flow.length) {
     h += `<div class="flow"><span class="lb">${L.flowLb}</span><button class="play" onclick="startStory()">${L.storyBtn}</button><ol>` +
@@ -527,6 +554,9 @@ function render() {
   }
   h += `<p class="note">${L.note(new Date(d.generated_at).toLocaleString(DATA.lang === "en" ? "en-US" : "ja-JP"), comments)}</p>`;
   if (impCount) h += `<button class="warp" onclick="nextImp()">${L.warp(impCount)}</button>`;
+  // 「✗おかしい」「?わからない」やコメントが1件でもあれば、AIへ戻す導線を出す
+  const fixables = Object.entries(rv).filter(([, v]) => v && (v.v === "ng" || v.v === "uk" || v.comment)).length;
+  if (fixables) h += `<button class="sendfix" onclick="sendFixes()">${L.sendFix(fixables)}</button>`;
   $("main").innerHTML = h;
 }
 function ans(ev, i, v) {
@@ -563,6 +593,45 @@ function revealSec(ev, el) { ev.stopPropagation(); el.classList.remove("veiled")
 function hideGuide() { lsSet("ct-guide-hide", "1"); render(); }
 function setFile(i) { activeFile = i < 0 ? "__all__" : FILEKEYS[i]; impIdx = -1; render(); window.scrollTo({ top: 0 }); }
 let impIdx = -1;
+async function publishAnswers(silent) {
+  // 共有ページ版: 回答をページ自身に埋め込んで保存し直す(AIにも届く)
+  if (!ARTIFACT_API) return false;
+  // 無害化するのは「プログラムの終わりと誤読される並び」だけ。正規表現などを壊さないよう最小限に絞る
+  const esc2 = s => String(s).replace(/<\/(script)/gi, "<\\/$1");
+  const doc = `<!doctype html><html lang="${DATA.lang === "en" ? "en" : "ja"}"><head><meta charset="utf-8">` +
+    `<title>${document.title}</title><style>${STYLE_SRC}</style></head><body>${BODY_SHELL}` +
+    `<script>window.EMBEDDED_DATA=${esc2(JSON.stringify(DATA))};window.EMBEDDED_REVIEW=${esc2(JSON.stringify(REVIEW))};</` + `script>` +
+    `<script>${esc2(APP_SRC)}</` + `script></body></html>`;
+  try {
+    await ARTIFACT_API.publish(doc);
+    if (!silent) toast(L.sentToAI);
+    return true;
+  } catch (e) {
+    if (!silent) toast(L.sendFail);
+    return false;
+  }
+}
+async function sendFixes() {
+  if (ARTIFACT_API && await publishAnswers(false)) return;  // ページ自身に保存 → AIへ届く
+  // 指摘の一覧を文章にしてコピー。チャットに貼れば、そのままAIが直せる
+  const rv = cur(), lines = [];
+  for (const s of DATA.sections) {
+    const st = rv[secKey(s)];
+    if (!st || !(st.v === "ng" || st.v === "uk" || st.comment)) continue;
+    const mark = st.v === "ng" ? "おかしい" : st.v === "uk" ? "わからない" : "コメント";
+    lines.push(`- ${s.file}:${s.lines}「${s.heading}」[${mark}]${st.comment ? " — " + st.comment : ""}`);
+  }
+  const msg = `${L.fixMsgHead}\n\n${lines.join("\n")}\n\n${L.fixMsgTail}`;
+  try {
+    await navigator.clipboard.writeText(msg);
+    toast(L.fixCopied);
+  } catch {
+    // コピーが使えない環境では、選んで手動コピーできるように表示する
+    const w = window.open("", "_blank", "width=560,height=420");
+    if (w) { w.document.body.style.cssText = "font:13px/1.7 sans-serif;padding:16px;white-space:pre-wrap"; w.document.body.textContent = msg; }
+    else toast(L.fixCopyFail);
+  }
+}
 function nextImp() {
   const imps = document.querySelectorAll(".sec.imp");
   if (!imps.length) return;
@@ -576,7 +645,16 @@ async function load(first) {
     if (!DATA) {
       DATA = window.EMBEDDED_DATA;
       canPost = false;
-      try { REVIEW = JSON.parse(lsGet("ct-review")) || {}; } catch { REVIEW = {}; }
+      // 前回このページに保存された回答があれば復元(誰が開いても同じ状態で見える)
+      if (window.EMBEDDED_REVIEW && Object.keys(window.EMBEDDED_REVIEW).length) {
+        REVIEW = window.EMBEDDED_REVIEW;
+      } else {
+        try { REVIEW = JSON.parse(lsGet("ct-review")) || {}; } catch { REVIEW = {}; }
+      }
+      // このページ自身に保存できる環境なら、指摘をAIへ直接届けられる
+      if (window.claude && typeof claude.use === "function") {
+        claude.use("artifact").then(a => { ARTIFACT_API = a; if (a) render(); }).catch(() => {});
+      }
       setLang();
       buildDefs();
       document.title = (DATA.lang === "en" ? "Code Interpreter — " : "コード通訳 — ") + DATA.project_name;
