@@ -1,7 +1,11 @@
 # X投稿(アップデート告知・2026-08-26)
 
-添付画像(推奨順): `docs/images/12-split-screen.png`(使い方の全体像・1枚目)、
-`docs/images/09-risk-colors.png`(危険度の色分け・2枚目)、`docs/images/10-risk-only.png`(危ない所だけ・3枚目)
+添付画像(推奨順):
+1. `docs/images/16-whats-new.png` — 更新内容の要約(1枚で全体が分かる)
+2. `docs/images/09-risk-colors.png` — 危険度の色分け(赤・橙・青)
+3. `docs/images/13-progress-map.png` — 進み具合の色分け(どこまで見たか)
+4. `docs/images/12-split-screen.png` — 使い方の全体像(左=チャット / 右=翻訳)
+5. `docs/images/15-home.png` — ホーム画面(一覧)
 
 ※ 画像はすべてリポジトリ同梱のデモ用アプリ。実案件のコードや未公開プロダクト名は写っていない。
 
@@ -9,17 +13,11 @@
 
 ## 本文(日本語)
 
-【アップデート】非エンジニア向けコード翻訳ツール「コード通訳」に、**危険度の色分け**を入れました。
-
-まず1枚目の画像が、僕の実際の使い方です。**Claude Codeの画面を半分に割って、左をチャット、右を翻訳画面**にしています。
-
-左で「コードを翻訳して」と頼む → 右に日本語の対訳が出る → 気になった所をその場で「✗おかしい」と答える → 左のチャットでAIが直す。**画面を行き来しないで、読むと直すが1つの窓で完結します。**
-
-2枚目・3枚目を見てください。左が日本語の説明、右が実際のコード。そして今回、**赤・橙・青の色**が付きました。
+【アップデート】非エンジニア向けコード翻訳ツール「コード通訳」を大きく更新しました。
 
 バイブコーディングで作ったアプリのコードって、全部が同じ重さに見えるんですよね。でも実際は違う。**お金を動かす場所、データを消す場所、外部に情報を送る場所**——ここだけは、作った本人が意味を分かっていないとまずい。
 
-そこで4段階に分けました。
+そこで今回、**危険度で色分け**しました(画像2枚目)。
 
 🔴 重大 — 外部への送信・課金・削除・個人情報
 🟠 要確認 — 異常時の動作、外部の部品
@@ -28,9 +26,28 @@
 
 判定はAIが6分類×重大度で自動算出。ただし**外部送信・課金削除・個人情報の3つは「中程度」でも赤に格上げ**しています。非エンジニアが一番知りたいのがそこだから。
 
-「🔴 危ない所だけ」ボタンを押すと、そこだけに絞られます。実測で374か所→45か所。1/8の分量で急所を確認できる。
+「🔴 危ない所だけ」を押すと、そこだけに絞られます。実測で374か所→45か所。**1/8の分量で急所を確認できる。**
 
-気になった箇所には ✓問題ない / ✗おかしい / ?わからない で答えられて、**「📮 指摘をAIへ送る」を押せばAIがそのまま直しにいきます。**
+---
+
+**もう一つの大きな変更が「読んだ記録が積み上がる」ようになったこと**(画像3枚目)。
+
+以前は1文字コードを直すと、それまで付けた「✓確認済み」が全部消えていました。これだとレビューが永遠に終わらない。
+
+今は:
+・触っていない所の ✓ は**そのまま残る**
+・変わった所だけ「🔄 再確認」に戻る
+・「▶ 続きから」で、答えていない所だけを表示
+
+さらに画面上部に**四角が並んだ帯**を置きました。四角1つがファイル1つで、緑=確認済み / 黄=途中 / 灰=未着手 / 赤枠=重大あり。**選ぶ前に「どこまで見たか」が一目で分かります。**
+
+翻訳も速くなりました。変更のあったファイルだけ訳し直すので、実測で**2,800行のプロジェクトが9分→1ファイル分(数十秒)**に。
+
+---
+
+使い方は、画像4枚目のとおりです。**Claude Codeの画面を半分に割って、左をチャット、右を翻訳画面**にしています。左で「◯◯のコードを見せて」と頼む → 右に日本語の対訳が出る → 気になった所を「✗おかしい」と答える → 「📮 指摘をAIへ送る」→ 左のチャットでAIが直す。
+
+**覚えるのは「◯◯のコードを見せて」の一言だけです。**
 
 ---
 
@@ -51,7 +68,7 @@ AIに「安全です/危険です」と判定させるのは簡単ですが、�
 MIT ライセンスで公開中です。
 
 GitHub: https://github.com/goonobu-dot/code-translator
-使い方(5分・画像つき): https://github.com/goonobu-dot/code-translator/blob/main/docs/manual.md
+使い方(5分・画像つき手順書): https://github.com/goonobu-dot/code-translator/blob/main/docs/manual.md
 
 #バイブコーディング #ClaudeCode #個人開発
 
@@ -59,17 +76,11 @@ GitHub: https://github.com/goonobu-dot/code-translator
 
 ## 本文(English)
 
-**Update:** Code Interpreter — the tool that translates code into plain language for non-engineers — now has **risk-based color coding**.
-
-The first image is how I actually use it: **Claude Code split in half — chat on the left, the translated code on the right.**
-
-Ask "translate the code" on the left → the plain-language pairing appears on the right → mark anything that bothers you with ✗ → the AI fixes it back in the chat. **Reading and fixing happen in one window.**
-
-Images 2 and 3: plain-language explanation on the left, real code on the right. New in this update: red, orange and blue markers.
+**Update:** Code Interpreter — the tool that translates code into plain language for non-engineers — got a major update.
 
 When you vibe-code an app, every line looks equally important. It isn't. **The places that move money, delete data, or send information outside** — those are the ones you need to actually understand.
 
-So there are now four levels:
+So now there is **risk-based color coding** (image 2):
 
 🔴 Serious — sends data out, charges, deletes, personal data
 🟠 Check this — failure handling, outside components
@@ -78,9 +89,28 @@ none — ordinary code
 
 The AI classifies by category × severity, but **sending data out, charging/deleting, and personal data get promoted to red even at medium severity** — that's what non-engineers most need to see.
 
-Press "🔴 Risky parts only" and the page narrows to just those: 374 units → 45 in a real project. One eighth of the reading, all of the risk.
+Press "🔴 Risky parts only" and a real project narrows from 374 units to 45. **One eighth of the reading, all of the risk.**
 
-You answer each unit with ✓ fine / ✗ wrong / ? unsure, and **"📮 Send flags to the AI" hands them straight back to the AI to fix.**
+---
+
+**The second big change: your review now accumulates** (image 3).
+
+Before, changing a single character wiped every "✓ reviewed" mark you had made. That made review impossible to ever finish.
+
+Now:
+・untouched units **keep their ✓**
+・only changed units return to "🔄 Re-check"
+・"▶ Continue" shows only what you haven't answered
+
+And a strip of small squares sits at the top — one square per file: green = reviewed, amber = partial, grey = untouched, red outline = contains something serious. **You can see how far you got before you even pick a file.**
+
+Translation got faster too: only changed files are re-translated. A 2,800-line project went from ~9 minutes to a few dozen seconds.
+
+---
+
+How I actually use it (image 4): **Claude Code split in half — chat on the left, the translated code on the right.** Ask on the left, read on the right, mark anything odd with ✗, press "📮 Send flags to the AI", and the AI fixes it back in the chat.
+
+**One phrase to remember: "show me the code for X".**
 
 ---
 
