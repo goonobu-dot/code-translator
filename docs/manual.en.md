@@ -55,6 +55,32 @@ Use `--lang en` for English output; the UI follows the translation language auto
 
 ---
 
+## 1'. Colors show you what matters
+
+![Risk colors](images/09-risk-colors.png)
+
+Some parts of a codebase can cause real harm. Those are marked in four levels.
+
+| Color | Meaning | Examples |
+|---|---|---|
+| 🔴 **Serious** | could cause real harm | sending data out, charging money, deleting, personal data |
+| 🟠 **Check this** | worth confirming | failure handling, outside components |
+| 🔵 **Good to know** | minor notes | small caveats |
+| none | ordinary code | loading, rendering |
+
+Each unit shows a chip ("🔴 Serious charges / deletes"), a colored bar on the left, and a soft tint.
+**Sending data out, charging or deleting, and personal data are raised to red even at medium severity** —
+those are what a non-engineer most needs to know.
+
+**Short on time? Press "🔴 Risky parts only"** to narrow the page down to what matters.
+
+![Risky parts only](images/10-risk-only.png)
+
+> Colors are the AI's reading, not a safety guarantee. The redder it is, the more you should
+> compare the explanation against the real code on the right.
+
+---
+
 ## 1. Press the file you want to see
 
 ![File buttons](images/en/02-filebar.png)
@@ -110,6 +136,18 @@ your judgment. Fixes happen only when you ask for them in chat.
 
 Open "Write a comment" and type in ordinary language, e.g. "add a confirmation screen before sending".
 Like ✗ answers, comments are picked up by the AI when you say "fix the flagged items" in chat.
+
+### Or press "📮 Send flags to the AI"
+
+![Send flags to the AI](images/11-sendfix.png)
+
+As soon as you have one ✗, ? or comment, a button appears at the bottom left. One press sends them.
+
+- **On the shareable page (ctrl+])** — the page saves your answers and notifies the AI.
+  Then just say "fix the flagged items" in chat.
+- **In a browser** — the list is copied to your clipboard; paste it into chat.
+
+Either way the result is the same. **You never have to figure out how to phrase it.**
 
 ---
 
