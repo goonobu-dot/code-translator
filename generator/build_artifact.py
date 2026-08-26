@@ -13,6 +13,9 @@ def main():
     data_file = target / ".code-translate" / "view" / "view-data.json"
     out_file = target / ".code-translate" / "artifact.html"
     data = data_file.read_text().replace("�", "")
+    # コード中の "</script>" や "<!--" はページ内のデータを途中で断ち切るため無害化する
+    # (JSONの文字列としては \/ も ! も同じ文字を表すので、中身は一切変わらない)
+    data = data.replace("</", "<\\/").replace("<!--", "<\\u0021--")
     src = (ROOT / "view-app.html").read_text()
 
     style = re.search(r"<style>.*?</style>", src, re.S).group(0)
