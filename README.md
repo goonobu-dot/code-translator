@@ -69,4 +69,5 @@ Claude Codeを使っている場合は、`skill/` を `~/.claude/skills/code-tra
 
 - 機械検査は簡易(候補発見用)。AST・動的解析は未実装
 - 翻訳はAI生成のため誤りうる。コードとの突き合わせ(対訳表示)を前提とする
+- 「その処理が良いか悪いか」の助言は**意図的に未実装**。理由と着手条件は [docs/open-questions.md](docs/open-questions.md)
 - 判定は表示であり、デプロイを物理的に止める仕組み(release-gate)は今後の課題
