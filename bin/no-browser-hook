@@ -1,0 +1,31 @@
+#!/bin/bash
+# ローカル画面を外部ブラウザで開こうとする操作を止める。
+# 目的: どのチャットでも「翻訳したらブラウザが勝手に開く」を起こさせない。
+# 代わりに、Claude Code内で開けるページ(アーティファクト)を渡すよう促す。
+set -u
+INPUT="$(cat)"
+
+python3 - "$INPUT" <<'EOF'
+import json, re, sys
+
+try:
+    data = json.loads(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].strip() else {}
+except Exception:
+    data = {}
+cmd = (data.get("tool_input") or {}).get("command", "")
+
+# 「open http://localhost…」「open http://127.0.0.1…」だけを対象にする(他の操作は妨げない)
+# 実際にコマンドとして実行される位置の open だけを見る(文章中の引用に反応しないように)
+if re.search(r"""(?:^|[;&|]\s*|\n\s*)open\s+["']?https?://(?:localhost|127\.0\.0\.1)""", cmd):
+    reason = (
+        "外部ブラウザでローカル画面を開くことは、この環境では禁止されています。"
+        "代わりに `python3 ~/Projects/code-translator/generator/build_artifact.py <対象>` で"
+        "1枚もののページを作り、Artifactツールで公開して、その**URLだけ**を本文に貼ってください。"
+        "ファイルパス(.code-translate/artifact.html など)をリンクとして出さないこと。"
+    )
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }}))
+EOF
