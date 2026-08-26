@@ -1,6 +1,9 @@
 # X投稿(アップデート告知・2026-08-26)
 
-添付画像: `docs/images/09-risk-colors.png`(危険度の色分け)、`docs/images/10-risk-only.png`(危ない所だけ)
+添付画像(推奨順): `docs/images/12-split-screen.png`(使い方の全体像・1枚目)、
+`docs/images/09-risk-colors.png`(危険度の色分け・2枚目)、`docs/images/10-risk-only.png`(危ない所だけ・3枚目)
+
+※ 画像はすべてリポジトリ同梱のデモ用アプリ。実案件のコードや未公開プロダクト名は写っていない。
 
 ---
 
@@ -8,7 +11,11 @@
 
 【アップデート】非エンジニア向けコード翻訳ツール「コード通訳」に、**危険度の色分け**を入れました。
 
-添付の画像を見てください。左が日本語の説明、右が実際のコード。そして今回、**赤・橙・青の色**が付きました。
+まず1枚目の画像が、僕の実際の使い方です。**Claude Codeの画面を半分に割って、左をチャット、右を翻訳画面**にしています。
+
+左で「コードを翻訳して」と頼む → 右に日本語の対訳が出る → 気になった所をその場で「✗おかしい」と答える → 左のチャットでAIが直す。**画面を行き来しないで、読むと直すが1つの窓で完結します。**
+
+2枚目・3枚目を見てください。左が日本語の説明、右が実際のコード。そして今回、**赤・橙・青の色**が付きました。
 
 バイブコーディングで作ったアプリのコードって、全部が同じ重さに見えるんですよね。でも実際は違う。**お金を動かす場所、データを消す場所、外部に情報を送る場所**——ここだけは、作った本人が意味を分かっていないとまずい。
 
@@ -54,7 +61,11 @@ GitHub: https://github.com/goonobu-dot/code-translator
 
 **Update:** Code Interpreter — the tool that translates code into plain language for non-engineers — now has **risk-based color coding**.
 
-Look at the screenshot: plain-language explanation on the left, real code on the right. New in this update: red, orange and blue markers.
+The first image is how I actually use it: **Claude Code split in half — chat on the left, the translated code on the right.**
+
+Ask "translate the code" on the left → the plain-language pairing appears on the right → mark anything that bothers you with ✗ → the AI fixes it back in the chat. **Reading and fixing happen in one window.**
+
+Images 2 and 3: plain-language explanation on the left, real code on the right. New in this update: red, orange and blue markers.
 
 When you vibe-code an app, every line looks equally important. It isn't. **The places that move money, delete data, or send information outside** — those are the ones you need to actually understand.
 
