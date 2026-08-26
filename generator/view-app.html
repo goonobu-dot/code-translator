@@ -334,6 +334,16 @@ function jumpRef(name) {
   const d = DEFS[name];
   if (d) jumpToLine(d.file, d.line);
 }
+// URLの末尾で場所を指定できるようにする(例: ...#payment.js:7 → その行へ飛んで光る)
+function jumpFromUrl() {
+  const raw = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+  if (!raw) return;
+  const m = raw.match(/^(.*?):(\d+)/);
+  if (!m) return;
+  const want = m[1];
+  const file = (DATA.files || []).find(f => f.path === want || f.path.endsWith("/" + want));
+  if (file) setTimeout(() => jumpToLine(file.path, parseInt(m[2]) || 1), 150);
+}
 // 注意カードから「危険度」を決める。外部送信・削除課金・個人情報は一段重く見る
 const RISK_CATS = { 1: true, 2: true, 3: true };   // 1=外部送信 2=高影響な操作 3=機密データ
 function riskOf(cards) {
@@ -737,6 +747,7 @@ async function load(first) {
       document.title = (DATA.lang === "en" ? "Code Interpreter — " : "コード通訳 — ") + DATA.project_name;
       applyTheme();
       render();
+      jumpFromUrl();   // URLで場所が指定されていれば、そこへ飛ぶ
     }
     return;
   }
@@ -755,6 +766,7 @@ async function load(first) {
       document.title = (DATA.lang === "en" ? "Code Interpreter — " : "コード通訳 — ") + d.project_name;
       applyTheme();
       render();
+      jumpFromUrl();   // URLで場所が指定されていれば、そこへ飛ぶ
       if (!first) toast(L.toastUpd);
     }
   } catch {
@@ -805,6 +817,9 @@ window.addEventListener("scroll", () => {
     $("ctxbar").textContent = label;
   });
 }, { passive: true });
+
+// 画面を開いたまま別の場所のリンクを踏んだときも飛べるようにする
+window.addEventListener("hashchange", () => { if (DATA) jumpFromUrl(); });
 
 applyTheme();
 load(true);
