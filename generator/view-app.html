@@ -323,27 +323,32 @@ function showStory() {
     `<button onclick="endStory()">✕</button>`;
   jumpFlow(storyIdx);
 }
-let VEIL = localStorage.getItem("ct-veil") === "1";
+// ブラウザの保存領域は環境によっては読み書き自体が失敗する。失敗しても画面は必ず出す。
+const MEM = {};
+function lsGet(k) { try { const v = localStorage.getItem(k); return v === null ? (k in MEM ? MEM[k] : null) : v; } catch { return k in MEM ? MEM[k] : null; } }
+function lsSet(k, v) { MEM[k] = v; try { localStorage.setItem(k, v); } catch {} }
+
+let VEIL = lsGet("ct-veil") === "1";
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const secKey = s => s.file + "|" + s.lines + "|" + s.heading;
 const cur = () => { const k = DATA.seal.hash; if (!REVIEW[k]) REVIEW[k] = {}; return REVIEW[k]; };
 
 function applyTheme() {
-  const t = localStorage.getItem("ct-theme") || "auto";
+  const t = lsGet("ct-theme") || "auto";
   if (t === "auto") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = t;
   $("tTheme").textContent = L.themes[THEMES.includes(t) ? t : "auto"];
 }
 $("tTheme").onclick = () => {
-  const c = localStorage.getItem("ct-theme") || "auto";
-  localStorage.setItem("ct-theme", THEMES[(THEMES.indexOf(c) + 1) % THEMES.length]);
+  const c = lsGet("ct-theme") || "auto";
+  lsSet("ct-theme", THEMES[(THEMES.indexOf(c) + 1) % THEMES.length]);
   applyTheme();
 };
-$("tVeil").onclick = () => { VEIL = !VEIL; localStorage.setItem("ct-veil", VEIL ? "1" : "0"); render(); };
+$("tVeil").onclick = () => { VEIL = !VEIL; lsSet("ct-veil", VEIL ? "1" : "0"); render(); };
 
 async function saveReview() {
-  localStorage.setItem("ct-review", JSON.stringify(REVIEW));
+  lsSet("ct-review", JSON.stringify(REVIEW));
   if (!canPost) return;
   try {
     const r = await fetch("/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(REVIEW) });
@@ -406,7 +411,7 @@ function render() {
   $("filebar").innerHTML = fb.join("");
 
   let h = "";
-  if (!localStorage.getItem("ct-guide-hide")) {
+  if (!lsGet("ct-guide-hide")) {
     h += `<div class="guide"><span>${L.guideShort}</span><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
   }
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
@@ -518,7 +523,7 @@ function editComment(ev, i) {
   if (ta) { ta.closest("details").open = true; ta.value = old; ta.focus(); }
 }
 function revealSec(ev, el) { ev.stopPropagation(); el.classList.remove("veiled"); el.removeAttribute("onclick"); }
-function hideGuide() { localStorage.setItem("ct-guide-hide", "1"); render(); }
+function hideGuide() { lsSet("ct-guide-hide", "1"); render(); }
 function setFile(i) { activeFile = i < 0 ? "__all__" : FILEKEYS[i]; impIdx = -1; render(); window.scrollTo({ top: 0 }); }
 let impIdx = -1;
 function nextImp() {
@@ -534,7 +539,7 @@ async function load(first) {
     if (!DATA) {
       DATA = window.EMBEDDED_DATA;
       canPost = false;
-      try { REVIEW = JSON.parse(localStorage.getItem("ct-review")) || {}; } catch { REVIEW = {}; }
+      try { REVIEW = JSON.parse(lsGet("ct-review")) || {}; } catch { REVIEW = {}; }
       setLang();
       buildDefs();
       document.title = (DATA.lang === "en" ? "Code Interpreter — " : "コード通訳 — ") + DATA.project_name;
@@ -590,7 +595,7 @@ window.addEventListener("scroll", () => {
 
 applyTheme();
 load(true);
-setInterval(() => load(false), 4000);
+if (!window.EMBEDDED_DATA) setInterval(() => load(false), 4000);
 </script>
 </body>
 </html>
