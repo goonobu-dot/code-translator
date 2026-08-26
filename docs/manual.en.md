@@ -55,6 +55,35 @@ Use `--lang en` for English output; the UI follows the translation language auto
 
 ---
 
+## 1''. Where you are, at a glance
+
+![Progress map](images/13-progress-map.png)
+
+A strip of small squares sits above the content — **one square per file**.
+
+| Color | Meaning |
+|---|---|
+| 🟩 green | fully reviewed (nothing left to read) |
+| 🟧 amber | partly reviewed |
+| ⬜ grey | not started |
+| **red outline** | contains something serious |
+
+Click a square to open that file. Hover to see its name and how much is left.
+
+Three buttons on the right narrow what you read:
+
+| Button | When to use it |
+|---|---|
+| **▶ Continue (N left)** | resume — shows only what you have not answered |
+| **🆕 Changed only (N)** | after editing code — shows only what changed |
+| **🔴 Risky parts only** | before shipping — shows only what matters |
+
+All three are temporary filters. Press again to see everything; reviewed units stay in place with a green bar and a "✓ Reviewed" chip.
+
+**Your answers survive edits.** Untouched units keep their ✓; only changed units return to "🔄 Re-check".
+
+---
+
 ## 1'. Colors show you what matters
 
 ![Risk colors](images/09-risk-colors.png)
