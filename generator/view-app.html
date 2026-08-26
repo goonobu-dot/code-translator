@@ -67,6 +67,7 @@
   .rchip.r3 { background:var(--crit-bg); color:var(--crit-fg); }
   .rchip.r2 { background:var(--warn-bg); color:var(--warn-fg); }
   .rchip.r1 { background:var(--soft); color:#4A7FA5; }
+  .rchip.rnew { background:var(--accent); color:var(--bg); }
   .legend { display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-bottom:10px; }
   .legend b { font-weight:700; }
   .legend .sw { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; vertical-align:middle; }
@@ -216,6 +217,8 @@ const UI = {
     legendLb: "色の意味:",
     legend3: "事故につながりうる(お金・削除・情報漏れ)", legend2: "内容を確かめたい", legend1: "知っておくとよい", legend0: "ふつうの処理",
     onlyRisk: "🔴 危ない所だけ", onlyRiskOff: "すべて表示",
+    onlyNew: n => `🆕 変更のみ${n ? " (" + n + ")" : ""}`, onlyNewOff: "すべて表示",
+    updated: "🆕 更新", recheck: "🔄 再確認",
     fixMsgHead: "コード通訳で気になった箇所です。内容を確認して直してください。",
     fixMsgTail: "(この一覧は翻訳画面の回答から作られています。直したら翻訳も更新してください)",
     fixCopied: "コピーしました。チャットに貼り付けて送ってください",
@@ -260,6 +263,8 @@ const UI = {
     legendLb: "Colors:",
     legend3: "could cause real harm (money, deletion, leaks)", legend2: "worth confirming", legend1: "good to know", legend0: "ordinary code",
     onlyRisk: "🔴 Risky parts only", onlyRiskOff: "Show all",
+    onlyNew: n => `🆕 Changed only${n ? " (" + n + ")" : ""}`, onlyNewOff: "Show all",
+    updated: "🆕 Updated", recheck: "🔄 Re-check",
     fixMsgHead: "These are the spots I flagged in the Code Interpreter. Please review and fix them.",
     fixMsgTail: "(This list comes from my answers in the translation view. After fixing, please refresh the translation.)",
     fixCopied: "Copied — paste it into chat and send",
@@ -289,7 +294,7 @@ const BODY_SHELL = (() => {
   return c.innerHTML;
 })();
 let ARTIFACT_API = null;  // ページ自身を保存できる環境かどうか(共有ページ版のみ)
-let SECKEYS = [], FILEKEYS = [], SECMETA = [], DEFS = {}, REFRE = null;
+let SECKEYS = [], FILEKEYS = [], SECMETA = [], SECSTAMP = [], DEFS = {}, REFRE = null;
 const DEF_RE = /(?:\bfunction\s+|\bfunc\s+|\bdef\s+|\bclass\s+|\bstruct\s+|\bconst\s+)([A-Za-z_][A-Za-z0-9_]{2,})/;
 function buildDefs() {
   DEFS = {};
@@ -404,11 +409,27 @@ function lsSet(k, v) { MEM[k] = v; try { localStorage.setItem(k, v); } catch {} 
 
 let VEIL = lsGet("ct-veil") === "1";
 let ONLY_RISK = false;  // 危ない所だけに絞って読むモード
-function toggleRisk() { ONLY_RISK = !ONLY_RISK; render(); window.scrollTo({ top: 0 }); }
+let ONLY_NEW = false;   // 前回から変わった所だけに絞るモード
+function toggleRisk() { ONLY_RISK = !ONLY_RISK; if (ONLY_RISK) ONLY_NEW = false; render(); window.scrollTo({ top: 0 }); }
+function toggleNew() { ONLY_NEW = !ONLY_NEW; if (ONLY_NEW) ONLY_RISK = false; render(); window.scrollTo({ top: 0 }); }
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const secKey = s => s.file + "|" + s.lines + "|" + s.heading;
-const cur = () => { const k = DATA.seal.hash; if (!REVIEW[k]) REVIEW[k] = {}; return REVIEW[k]; };
+// 回答はプロジェクト単位で保管する。コードが変わっても消さず、変わった箇所だけ「再確認」に戻す
+const cur = () => { const k = DATA.project_id || DATA.seal.hash; if (!REVIEW[k]) REVIEW[k] = {}; return REVIEW[k]; };
+// そのまとまりが指すコードの指紋(変わったかどうかの判定に使う)
+function secStamp(s) {
+  const f = (DATA.files || []).find(x => x.path === s.file);
+  if (!f) return "";
+  const m = String(s.lines).split("-").map(Number);
+  const a = m[0] || 1, b = m[1] || m[0] || 1;
+  let acc = 0;
+  for (let n = a; n <= Math.min(b, f.lines.length); n++) {
+    const line = f.lines[n - 1] || "";
+    for (let i = 0; i < line.length; i++) acc = (acc * 31 + line.charCodeAt(i)) >>> 0;
+  }
+  return String(acc);
+}
 
 function applyTheme() {
   const t = lsGet("ct-theme") || "auto";
@@ -503,10 +524,14 @@ function render() {
     h += `<div class="guide"><span>${L.guideShort}</span><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
   }
   if (!canPost && !ARTIFACT_API) h += `<div class="guide"><span>${L.shareNote}</span></div>`;
+  // 変更のあったファイルに属するまとまりの数(「🆕 変更のみ」の件数表示に使う)
+  const changedFiles = new Set((d.files || []).filter(f => f.changed).map(f => f.path));
+  const newCount = changedFiles.size ? secs.filter(s => changedFiles.has(s.file)).length : 0;
   h += `<div class="legend"><span>${L.legendLb}</span>` +
     [3, 2, 1].map(n => `<span><span class="sw" style="background:${n === 3 ? "var(--crit-fg)" : n === 2 ? "var(--warn-fg)" : "#4A7FA5"}"></span><b>${L.risk[n]}</b> ${n === 3 ? L.legend3 : n === 2 ? L.legend2 : L.legend1}</span>`).join("") +
     `<span><span class="sw" style="background:var(--line)"></span>${L.legend0}</span>` +
-    `<button class="hbtn${ONLY_RISK ? " on" : ""}" style="margin-left:auto" onclick="toggleRisk()">${ONLY_RISK ? L.onlyRiskOff : L.onlyRisk}</button></div>`;
+    `<button class="hbtn${ONLY_NEW ? " on" : ""}" style="margin-left:auto" onclick="toggleNew()">${ONLY_NEW ? L.onlyNewOff : L.onlyNew(newCount)}</button>` +
+    `<button class="hbtn${ONLY_RISK ? " on" : ""}" onclick="toggleRisk()">${ONLY_RISK ? L.onlyRiskOff : L.onlyRisk}</button></div>`;
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
   if (d.flow && d.flow.length) {
     h += `<div class="flow"><span class="lb">${L.flowLb}</span><button class="play" onclick="startStory()">${L.storyBtn}</button><ol>` +
@@ -532,8 +557,14 @@ function render() {
     d.line_translations.filter(t => t.file === f.path).forEach(t => ltMap[t.line] = t);
     h += `<div class="filehead">${esc(f.path)}<span class="role">${f.role ? "— " + esc(f.role) : ""}</span>${f.author ? `<span class="achip">${L.author}: ${esc(f.author)}</span>` : ""}</div><div class="pairsfile">`;
     fsecs.forEach((s, si) => {
-      const k = secKey(s), st = rv[k] || {};
+      const k = secKey(s);
+      const stamp = secStamp(s);
+      let st = rv[k] || {};
+      // 答えた後にコードが変わっていたら、その回答は「要再確認」として扱う(消しはしない)
+      const stale = !!(st.v && st.stamp && st.stamp !== stamp);
+      if (stale) st = { ...st, v: null, wasStale: true };
       const ki = SECKEYS.push(k) - 1;
+      SECSTAMP[ki] = stamp;
       const lines = [];
       for (let n = spans[si].a; n <= Math.min(spans[si].b, f.lines.length); n++) lines.push(n);
       if (!lines.length) lines.push(spans[si].a);
@@ -543,6 +574,8 @@ function render() {
       const rlv = riskOf(secCards);
       if (rlv) riskCount[rlv] = (riskCount[rlv] || 0) + 1;
       if (ONLY_RISK && rlv < 2) return;  // 絞り込み中は「重大」「要確認」だけ出す
+      const isNew = !!f.changed || stale;
+      if (ONLY_NEW && !isNew) return;    // 「変更のみ」では、新しく訳し直された所と再確認だけ出す
       const veiled = VEIL && !imp && !st.v;
       let code = "";
       for (const n of lines) {
@@ -554,7 +587,7 @@ function render() {
       SECMETA[ki] = { file: f.path, a: lines[0], b: lines[lines.length - 1] };
       h += `<div class="sec${rlv ? " r" + rlv : ""}${border}${veiled ? " veiled" : ""}" id="s${ki}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
         <div class="sec-l"><div class="lwrap">
-          <div class="sec-h">${rlv ? `<span class="rchip r${rlv}">${L.risk[rlv]}${secCards[0] ? " " + L.cat[secCards[0].category] : ""}</span>` : ""}${esc(s.heading)}<span class="sec-a">${L.lines(esc(String(s.lines)))}</span></div>
+          <div class="sec-h">${stale ? `<span class="rchip rnew">${L.recheck}</span>` : isNew ? `<span class="rchip rnew">${L.updated}</span>` : ""}${rlv ? `<span class="rchip r${rlv}">${L.risk[rlv]}${secCards[0] ? " " + L.cat[secCards[0].category] : ""}</span>` : ""}${esc(s.heading)}<span class="sec-a">${L.lines(esc(String(s.lines)))}</span></div>
           ${(() => {
             const ch = scopeChain(f, lines[0]);
             return ch.length ? `<div class="crumb">📦 ${ch.map(n => `<span class="cn" onclick="event.stopPropagation();jumpRef('${n}')">${esc(n)}</span>`).join(" › ")} ${L.crumbIn}</div>` : "";
@@ -608,7 +641,8 @@ function ans(ev, i, v) {
   if (k === undefined) return;
   const rv = cur();
   if (!rv[k]) rv[k] = {};
-  if (v) { rv[k].v = v; rv[k].t = Date.now(); } else { delete rv[k].v; }
+  // 答えた時点のコードの指紋を一緒に残す(後でコードが変わったら「再確認」に戻すため)
+  if (v) { rv[k].v = v; rv[k].t = Date.now(); rv[k].stamp = SECSTAMP[i] || ""; } else { delete rv[k].v; }
   if (!rv[k].v && !rv[k].comment) delete rv[k];
   saveReview(); render();
 }

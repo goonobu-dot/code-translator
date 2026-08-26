@@ -305,7 +305,7 @@ SUMMARY_PROMPT = """あなたは「コード通訳」です。以下は1つの�
 PARALLEL = 8  # 同時に走らせるAI発注数。待ち時間はほぼこの数に反比例する
 
 
-def analyze_per_file(analyzed, findings, args):
+def analyze_per_file(analyzed, findings, args, skip_summary=False):
     """ファイル1つずつAIに発注(並列)。出力量の限界による分割の打ち切りを根本回避する。"""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     import time as _time
@@ -353,6 +353,12 @@ def analyze_per_file(analyzed, findings, args):
         c["id"] = f"c{i}"
 
     # 全体要約と「処理の流れ」は、各ファイルの見出し一覧から別途1回で生成
+    # (ファイルの顔ぶれが変わっていない増分更新では、前回のものを使うのでAIを呼ばない)
+    if skip_summary:
+        merged["app_summary"] = ""
+        merged["flow"] = []
+        return merged, {"cost_usd": round(total_cost, 4), "duration_ms": None, "model": args.model,
+                        "mode": f"per-file x{len(analyzed)} (要約は据え置き)"}, failed
     outline = []
     for path, role in merged["file_roles"].items():
         outline.append(f"\n### {path} — {role}")
@@ -405,6 +411,21 @@ def main():
         except Exception:
             prev = None
     if prev and not args.force and prev.get("seal", {}).get("hash") == seal["hash"] and prev.get("lang") == args.lang:
+        # 旧形式からの移行: 封印が一致=中身は当時のままなので、各ファイルの指紋を後付けする
+        # (これで既存プロジェクトも、全訳をやり直さずに増分翻訳へ移行できる)
+        cur_hash = {f["path"]: hashlib.sha256(f["text"].encode()).hexdigest()[:16] for f in analyzed}
+        stamped = False
+        for pf in prev.get("files", []):
+            if not pf.get("hash") and pf["path"] in cur_hash:
+                pf["hash"] = cur_hash[pf["path"]]
+                pf["changed"] = False
+                stamped = True
+        if stamped:
+            prev.setdefault("project_id", hashlib.sha256(str(root).encode()).hexdigest()[:12])
+            prev["generated_at"] = datetime.now(timezone.utc).isoformat()
+            out_file.write_text(json.dumps(prev, ensure_ascii=False, indent=1))
+            print("既存の翻訳に指紋を付けました(次回から変更分だけ翻訳します)。")
+            return
         if prev.get("seal") != seal or prev.get("unanalyzed") != unanalyzed:
             prev["seal"] = seal
             prev["unanalyzed"] = unanalyzed
@@ -415,15 +436,38 @@ def main():
             print("変更なし(封印一致)。再翻訳をスキップしました。")
         return
 
-    total_lines = sum(len(f["text"].splitlines()) for f in analyzed)
+    # 増分翻訳: 中身が変わっていないファイルは前回の翻訳をそのまま使う(AIを呼ばない)
+    for f in analyzed:
+        f["hash"] = hashlib.sha256(f["text"].encode()).hexdigest()[:16]
+    reuse = {}
+    if prev and not args.force and prev.get("lang") == args.lang:
+        prev_files = {pf["path"]: pf for pf in prev.get("files", [])}
+        for f in analyzed:
+            pf = prev_files.get(f["path"])
+            if not pf:
+                continue
+            if pf.get("hash"):
+                if pf["hash"] == f["hash"]:
+                    reuse[f["path"]] = True
+            # 指紋が無い旧データでも、保存してあるコード本文と突き合わせれば据え置き判定できる
+            elif pf.get("lines") == f["text"].splitlines()[:MAX_LINES]:
+                reuse[f["path"]] = True
+    fresh = [f for f in analyzed if f["path"] not in reuse]
+    if reuse and fresh:
+        print(f"変更のあった {len(fresh)} ファイルだけ翻訳します(据え置き {len(reuse)} ファイル)", flush=True)
+
+    total_lines = sum(len(f["text"].splitlines()) for f in fresh)
     try:
-        if total_lines <= 400:
-            ai, meta = call_claude(build_prompt(analyzed, findings, args.lang), args.model)
+        if not fresh:
+            ai, meta, failed = {"sections": [], "cards": [], "line_translations": [], "file_roles": {}}, {"cost_usd": 0, "model": args.model, "mode": "reuse-only"}, []
+        elif total_lines <= 400 and not reuse:
+            ai, meta = call_claude(build_prompt(fresh, findings, args.lang), args.model)
         else:
             est = total_lines / 1000 * 90 / 60  # 実測: 8並列で1,000行あたり約1.5分
-            print(f"ファイル別に翻訳します({len(analyzed)}ファイル・{total_lines}行・{PARALLEL}並列)。"
+            print(f"ファイル別に翻訳します({len(fresh)}ファイル・{total_lines}行・{PARALLEL}並列)。"
                   f"目安 約{est:.0f}分…", flush=True)
-            ai, meta, failed = analyze_per_file(analyzed, findings, args)
+            lineup_same = bool(prev) and {f["path"] for f in analyzed} == {pf["path"] for pf in prev.get("files", [])}
+            ai, meta, failed = analyze_per_file(fresh, findings, args, skip_summary=bool(reuse) and lineup_same)
             if failed:
                 analyzed = [f for f in analyzed if f["path"] not in failed]
                 for p in failed:
@@ -439,6 +483,21 @@ def main():
     for f in analyzed:
         if f.pop("truncated", False):
             unanalyzed.append({"path": f["path"], "reason": MSGS[args.lang]["truncated"]})
+
+    # 据え置きファイルの翻訳を前回分から復元して合流する(ここが増分翻訳の要)
+    if reuse and prev:
+        prev_roles = {pf["path"]: pf.get("role", "") for pf in prev.get("files", [])}
+        for key, out in (("sections", "sections"), ("cards", "cards"), ("line_translations", "line_translations")):
+            kept = [x for x in prev.get(key, []) if x.get("file") in reuse]
+            ai.setdefault(out, []).extend(kept)
+        ai.setdefault("file_roles", {}).update({p: prev_roles.get(p, "") for p in reuse})
+        # 全体像は、ファイルの顔ぶれが変わっていなければ前回のものを使う(AIを呼ばない)
+        same_lineup = {f["path"] for f in analyzed} == set(prev_roles)
+        if same_lineup:
+            ai["app_summary"] = prev.get("app_summary") or ai.get("app_summary", "")
+            ai["flow"] = prev.get("flow") or ai.get("flow", [])
+        for i, c in enumerate(ai.get("cards", []), 1):
+            c["id"] = f"c{i}"
 
     # AI出力の検証: 「意味のまとまり」が無ければ失敗として扱い、分割から漏れた行は正直に台帳へ載せる
     sections = ai.get("sections", [])
@@ -475,11 +534,15 @@ def main():
         "project_name": root.name,
         "seal": seal,
         "app_summary": ai.get("app_summary", ""),
+        # project_id: 同じプロジェクトかを見分ける不変の印(回答をコード変更後も引き継ぐために使う)
+        "project_id": hashlib.sha256(str(root).encode()).hexdigest()[:12],
         "files": [
             {
                 "path": f["path"],
                 "role": ai.get("file_roles", {}).get(f["path"], ""),
                 "author": git["authors"].get(f["path"], ""),
+                "hash": f["hash"],                       # 中身の指紋(増分翻訳の判定に使う)
+                "changed": f["path"] not in reuse,       # 今回translateし直したか(🆕表示に使う)
                 "lines": f["text"].splitlines()[:MAX_LINES],
             }
             for f in analyzed
