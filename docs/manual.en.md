@@ -34,10 +34,15 @@ Three ways, same screen:
 The tool **first has AI read and translate the whole codebase, then opens the view**.
 Nothing appears instantly — you wait for the translation to finish.
 
+**Rule of thumb: about 1.5 minutes per 1,000 lines of code** (measured; more files means more parallelism, so larger projects scale better than linearly).
+
 | Size of the codebase | Typical wait |
 |---|---|
-| Small app (3 files, ~150 lines) | **~2 minutes** |
-| Medium app (23 files, ~2,800 lines) | **~5 minutes** |
+| Small app (up to ~200 lines) | **~2 minutes** |
+| Medium app (~3,000 lines) | **~5 minutes** |
+| Larger app (~8,000 lines) | **~12 minutes** |
+
+Big projects can exceed 10 minutes. While it runs you see live progress — `[7/35] path/to/file (about 4.2 min left)` — so you can tell it is working, not stuck.
 
 - The page stays closed while it runs and opens automatically when done
 - You can keep asking for other work in chat while you wait

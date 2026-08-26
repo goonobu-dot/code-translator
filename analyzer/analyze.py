@@ -302,9 +302,13 @@ SUMMARY_PROMPT = """あなたは「コード通訳」です。以下は1つの�
 """
 
 
+PARALLEL = 8  # 同時に走らせるAI発注数。待ち時間はほぼこの数に反比例する
+
+
 def analyze_per_file(analyzed, findings, args):
-    """ファイル1つずつAIに発注(4並列)。出力量の限界による分割の打ち切りを根本回避する。"""
-    from concurrent.futures import ThreadPoolExecutor
+    """ファイル1つずつAIに発注(並列)。出力量の限界による分割の打ち切りを根本回避する。"""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import time as _time
     by_file = {}
     for fd in findings:
         by_file.setdefault(fd["file"], []).append(fd)
@@ -321,10 +325,16 @@ def analyze_per_file(analyzed, findings, args):
 
     merged = {"file_roles": {}, "sections": [], "cards": [], "line_translations": []}
     total_cost, failed = 0.0, []
-    with ThreadPoolExecutor(max_workers=4) as ex:
+    started, done_n, total_n = _time.time(), 0, len(analyzed)
+    with ThreadPoolExecutor(max_workers=PARALLEL) as ex:
         futs = {ex.submit(work, f): f for f in analyzed}
-        for fut in list(futs):
+        for fut in as_completed(futs):
             f = futs[fut]
+            done_n += 1
+            # 進み具合と残り時間の見込みを出す(黙って待たせない)
+            el = _time.time() - started
+            eta = el / done_n * (total_n - done_n)
+            print(f"  [{done_n}/{total_n}] {f['path']}  (残り約{eta/60:.1f}分)", flush=True)
             try:
                 path, (js, meta) = fut.result()
             except RuntimeError as e:
@@ -410,7 +420,9 @@ def main():
         if total_lines <= 400:
             ai, meta = call_claude(build_prompt(analyzed, findings, args.lang), args.model)
         else:
-            print(f"ファイル別に翻訳します({len(analyzed)}ファイル・4並列)…")
+            est = total_lines / 1000 * 90 / 60  # 実測: 8並列で1,000行あたり約1.5分
+            print(f"ファイル別に翻訳します({len(analyzed)}ファイル・{total_lines}行・{PARALLEL}並列)。"
+                  f"目安 約{est:.0f}分…", flush=True)
             ai, meta, failed = analyze_per_file(analyzed, findings, args)
             if failed:
                 analyzed = [f for f in analyzed if f["path"] not in failed]
