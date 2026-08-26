@@ -222,6 +222,7 @@ const UI = {
     legend3: "事故につながりうる(お金・削除・情報漏れ)", legend2: "内容を確かめたい", legend1: "知っておくとよい", legend0: "ふつうの処理",
     onlyRisk: "🔴 危ない所だけ", onlyRiskOff: "すべて表示",
     onlyNew: n => `🆕 変更のみ${n ? " (" + n + ")" : ""}`, onlyNewOff: "すべて表示",
+    onlyTodo: n => `▶ 続きから (残り${n})`, onlyTodoOff: "すべて表示",
     updated: "🆕 更新", recheck: "🔄 再確認",
     pendingMsg: "✨ 新しい翻訳ができました", pendingApply: "読み終わったら切り替える",
     fixMsgHead: "コード通訳で気になった箇所です。内容を確認して直してください。",
@@ -269,6 +270,7 @@ const UI = {
     legend3: "could cause real harm (money, deletion, leaks)", legend2: "worth confirming", legend1: "good to know", legend0: "ordinary code",
     onlyRisk: "🔴 Risky parts only", onlyRiskOff: "Show all",
     onlyNew: n => `🆕 Changed only${n ? " (" + n + ")" : ""}`, onlyNewOff: "Show all",
+    onlyTodo: n => `▶ Continue (${n} left)`, onlyTodoOff: "Show all",
     updated: "🆕 Updated", recheck: "🔄 Re-check",
     pendingMsg: "✨ A newer translation is ready", pendingApply: "Switch when you're done reading",
     fixMsgHead: "These are the spots I flagged in the Code Interpreter. Please review and fix them.",
@@ -439,6 +441,8 @@ function applyPending() {
 }
 let ONLY_RISK = false;  // 危ない所だけに絞って読むモード
 let ONLY_NEW = false;   // 前回から変わった所だけに絞るモード
+let ONLY_TODO = false;  // まだ答えていない所だけに絞る(続きから読む)
+function toggleTodo() { ONLY_TODO = !ONLY_TODO; if (ONLY_TODO) { ONLY_NEW = false; ONLY_RISK = false; } render(); window.scrollTo({ top: 0 }); }
 function toggleRisk() { ONLY_RISK = !ONLY_RISK; if (ONLY_RISK) ONLY_NEW = false; render(); window.scrollTo({ top: 0 }); }
 function toggleNew() { ONLY_NEW = !ONLY_NEW; if (ONLY_NEW) ONLY_RISK = false; render(); window.scrollTo({ top: 0 }); }
 const $ = id => document.getElementById(id);
@@ -556,10 +560,12 @@ function render() {
   // 変更のあったファイルに属するまとまりの数(「🆕 変更のみ」の件数表示に使う)
   const changedFiles = new Set((d.files || []).filter(f => f.changed).map(f => f.path));
   const newCount = changedFiles.size ? secs.filter(s => changedFiles.has(s.file)).length : 0;
+  const todoCount = remain;  // まだ答えていない数(「続きから」の件数表示に使う)
   h += `<div class="legend"><span>${L.legendLb}</span>` +
     [3, 2, 1].map(n => `<span><span class="sw" style="background:${n === 3 ? "var(--crit-fg)" : n === 2 ? "var(--warn-fg)" : "#4A7FA5"}"></span><b>${L.risk[n]}</b> ${n === 3 ? L.legend3 : n === 2 ? L.legend2 : L.legend1}</span>`).join("") +
     `<span><span class="sw" style="background:var(--line)"></span>${L.legend0}</span>` +
-    `<button class="hbtn${ONLY_NEW ? " on" : ""}" style="margin-left:auto" onclick="toggleNew()">${ONLY_NEW ? L.onlyNewOff : L.onlyNew(newCount)}</button>` +
+    (answered ? `<button class="hbtn${ONLY_TODO ? " on" : ""}" style="margin-left:auto" onclick="toggleTodo()">${ONLY_TODO ? L.onlyTodoOff : L.onlyTodo(todoCount)}</button>` : "") +
+    `<button class="hbtn${ONLY_NEW ? " on" : ""}"${answered ? "" : ' style="margin-left:auto"'} onclick="toggleNew()">${ONLY_NEW ? L.onlyNewOff : L.onlyNew(newCount)}</button>` +
     `<button class="hbtn${ONLY_RISK ? " on" : ""}" onclick="toggleRisk()">${ONLY_RISK ? L.onlyRiskOff : L.onlyRisk}</button></div>`;
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
   if (d.flow && d.flow.length) {
@@ -605,6 +611,7 @@ function render() {
       if (ONLY_RISK && rlv < 2) return;  // 絞り込み中は「重大」「要確認」だけ出す
       const isNew = !!f.changed || stale;
       if (ONLY_NEW && !isNew) return;    // 「変更のみ」では、新しく訳し直された所と再確認だけ出す
+      if (ONLY_TODO && st.v) return;     // 「続きから」では、まだ答えていない所だけ出す
       const veiled = VEIL && !imp && !st.v;
       let code = "";
       for (const n of lines) {

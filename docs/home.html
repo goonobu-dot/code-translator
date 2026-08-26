@@ -1,0 +1,31 @@
+<meta charset="utf-8">
+<title>コード通訳 ホーム</title>
+<style>
+:root { --bg:#F7F8F7; --surface:#FFF; --ink:#242B2E; --muted:#67736F; --line:#E2E5E0;
+  --accent:#0E7C66; --crit-bg:#FBEAE8; --crit-fg:#791F1F; --warn-bg:#FBF3E1; --warn-fg:#633806; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#14181A; --surface:#1D2326; --ink:#E4E8E4; --muted:#96A29E; --line:#2C3538;
+  --accent:#3FB392; --crit-bg:#331E1C; --crit-fg:#E88B81; --warn-bg:#2E2718; --warn-fg:#E0B45E; } }
+:root[data-theme="dark"] { --bg:#14181A; --surface:#1D2326; --ink:#E4E8E4; --muted:#96A29E;
+  --line:#2C3538; --accent:#3FB392; --crit-bg:#331E1C; --crit-fg:#E88B81; --warn-bg:#2E2718; --warn-fg:#E0B45E; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; font-size:14px; line-height:1.8; }
+main { max-width:760px; margin:0 auto; padding:28px 20px 60px; }
+h1 { font-size:19px; margin:0 0 4px; }
+.sub { color:var(--muted); font-size:12.5px; margin-bottom:22px; }
+a.card { display:block; text-decoration:none; color:inherit; background:var(--surface);
+  border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-bottom:12px; }
+a.card:hover { border-color:var(--accent); }
+.name { font-weight:700; font-size:16px; }
+.meta { color:var(--muted); font-size:12.5px; margin-top:3px; }
+.tags { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+.tag { font-size:11.5px; padding:1px 10px; border-radius:999px; background:var(--warn-bg); color:var(--warn-fg); }
+.tag.red { background:var(--crit-bg); color:var(--crit-fg); font-weight:700; }
+.tag.plain { background:transparent; color:var(--muted); border:1px solid var(--line); }
+.how { background:var(--surface); border-left:3px solid var(--accent); border-radius:8px;
+  padding:12px 16px; margin-top:24px; font-size:13px; }
+.how b { color:var(--accent); }
+.how ol { margin:8px 0 0; padding-left:1.4em; }
+</style>
+<main><h1>📖 コード通訳</h1><div class="sub">読みたいプロジェクトを押してください。</div><a class="card" href="https://claude.ai/code/artifact/1aa73c86-2315-4a94-a562-e881373c4407"><div class="name">D200X(vibe-deck)</div><div class="meta">最後に読めるようにした日時: 08/26 16:46</div><div class="tags"><span class="tag red">🔴 重大 35件</span><span class="tag plain">34ファイル / 374か所</span></div></a><a class="card" href="https://claude.ai/code/artifact/7b86bc3e-8adb-44a8-8470-bf6d2efee3e3"><div class="name">エッジ惑星</div><div class="meta">最後に読めるようにした日時: 08/26 16:53</div><div class="tags"><span class="tag red">🔴 重大 14件</span><span class="tag plain">24ファイル / 258か所</span></div></a><a class="card" href="https://claude.ai/code/artifact/fa9f3d16-0290-43f6-b55c-ee1de3919fb9"><div class="name">デモ(予約アプリ)</div><div class="meta">最後に読めるようにした日時: 08/26 18:39</div><div class="tags"><span class="tag red">🔴 重大 11件</span><span class="tag plain">6ファイル / 25か所</span></div></a><div class="how"><b>使い方はこれだけ</b><ol><li>上から読みたいものを押す</li><li><b>🔴 危ない所だけ</b> を押すと要点だけ見えます</li><li>気になった所は <b>✗</b> を押して <b>📮 指摘をAIへ送る</b></li><li>チャットで「<b>指摘を直して</b>」と言えばAIが直します</li></ol><div style="margin-top:10px;color:var(--muted);font-size:12.5px">新しく読めるようにしたいときは、チャットで「<b>◯◯のコードを見せて</b>」と言ってください。</div></div></main>
