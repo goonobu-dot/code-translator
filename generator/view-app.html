@@ -181,6 +181,7 @@ const UI = {
     flowLb: "何が起きるか(押すとそのコードへ)",
     storyBtn: "▶ 順番に読む", storyPrev: "← 前へ", storyNext: "次へ →", storyDone: "おわり",
     crumbIn: "の中",
+    shareNote: "📄 これは共有・保存用のページです。✓✗?の回答はこの端末の中だけに残り、AIには渡りません。指摘をAIに直させたいときは、チャットで「翻訳を開いて」と言ってブラウザ版を使ってください。",
     filesLeft: (a, b) => `未確認 ${a} / ${b} ファイル`,
     guideShort: "使い方: 上のファイル名を押す → 説明を読む → ✓ / ✗ / ? を押す。✗とコメントはチャットで「たまった指摘を直して」と言えばAIが対応。",
     cmtOpen: "コメントを書く", cmtPh: "例: ここは確認画面を挟んでほしい", save: "保存",
@@ -212,6 +213,7 @@ const UI = {
     flowLb: "What happens (click to jump to the code)",
     storyBtn: "▶ Read in order", storyPrev: "← Back", storyNext: "Next →", storyDone: "Done",
     crumbIn: "— inside this",
+    shareNote: "📄 This is the shareable copy. Your ✓/✗/? answers stay in this browser only and never reach the AI. To have the AI fix what you flag, ask in chat to open the translation and use the browser version.",
     filesLeft: (a, b) => `${a} of ${b} files left`,
     guideShort: 'How to: press a file name above → read each unit → press ✓ / ✗ / ?. ✗ answers and comments are fixed when you say "fix the flagged items" in chat.',
     cmtOpen: "Write a comment", cmtPh: "e.g. add a confirmation screen before sending", save: "Save",
@@ -438,6 +440,7 @@ function render() {
   if (!lsGet("ct-guide-hide")) {
     h += `<div class="guide"><span>${L.guideShort}</span><button class="gbtn" onclick="hideGuide()">${L.gotIt}</button></div>`;
   }
+  if (!canPost) h += `<div class="guide"><span>${L.shareNote}</span></div>`;
   h += `<div class="summary"><span class="lb">${L.sumLb}</span><p style="margin:4px 0 0">${esc(d.app_summary)}</p></div>`;
   if (d.flow && d.flow.length) {
     h += `<div class="flow"><span class="lb">${L.flowLb}</span><button class="play" onclick="startStory()">${L.storyBtn}</button><ol>` +
