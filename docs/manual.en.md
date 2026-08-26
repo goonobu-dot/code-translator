@@ -34,15 +34,17 @@ Three ways, same screen:
 The tool **first has AI read and translate the whole codebase, then opens the view**.
 Nothing appears instantly — you wait for the translation to finish.
 
-| Size of the codebase | Typical wait | Typical cost |
-|---|---|---|
-| Small app (3 files, ~150 lines) | **~2 minutes** | ~$0.2–0.35 |
-| Medium app (23 files, ~2,800 lines) | **~5 minutes** | ~$3.5 |
+| Size of the codebase | Typical wait |
+|---|---|
+| Small app (3 files, ~150 lines) | **~2 minutes** |
+| Medium app (23 files, ~2,800 lines) | **~5 minutes** |
 
-- The page stays closed while it runs and opens automatically when done (chat reports time and cost)
+- The page stays closed while it runs and opens automatically when done
 - You can keep asking for other work in chat while you wait
-- **From the second run on it opens instantly and costs nothing** unless the code changed; only changed parts are redone
+- **From the second run on it opens instantly** unless the code changed; only changed parts are redone
 - Stopping midway breaks nothing — ask again and it resumes
+
+**About cost**: translation runs inside your existing **Claude Code plan — there is no extra charge** (it is covered by Pro/Max and similar plans). Only if you run Claude with your own API key does it consume API usage as usual.
 
 Use `--lang en` for English output; the UI follows the translation language automatically.
 
@@ -133,7 +135,7 @@ The same active-recall loop as language flashcards. (⚠ cards stay visible for 
 They are invalidated automatically and every card resets — approvals of old code are never carried over to new code. The screen switches to the new translation on its own.
 
 **Q. What does it cost?**
-Only translation generation costs money (~$0.1–0.3 per run for a small app, via the Claude CLI). Unchanged code is never re-translated.
+**No extra charge.** Translation runs inside your existing Claude Code plan (Pro/Max and similar), and opening the view is always free. Only if you run Claude with your own API key does it consume API usage as usual.
 
 **Q. Can the translation be wrong?**
 Yes — it is AI-generated. That's why the real code always sits next to the explanation, and unread files are shown in red. Use the ⚠ marks and the verdict, not the translation alone.

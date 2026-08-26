@@ -48,7 +48,7 @@ Polished reports make people careless. So I built the opposite.
 2. code-translate your-app --open --lang en
 3. Your browser opens. From then on, just double-click the launcher file it drops in your folder
 
-Works standalone or with Claude Code (~$0.1–0.3 per translation for a small app; unchanged code is never re-translated).
+Works standalone or with Claude Code — translation runs inside your existing plan, no extra charge; unchanged code is never re-translated.
 
 If you're vibe coding anything real — or reviewing what an AI or contractor shipped you — I'd love your feedback. Stars appreciated more than you know.
 

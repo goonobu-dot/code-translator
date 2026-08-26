@@ -481,8 +481,9 @@ def main():
         "meta": {**meta, "elapsed_s": round(time.time() - t0, 1)},
     }
     out_file.write_text(json.dumps(data, ensure_ascii=False, indent=1).replace("�", ""))
+    # 金額は表示しない(Claude Codeの利用枠内で動くため。cost_usdはAPI換算の目安として記録のみ残す)
     print(f"OK: {out_file}  cards={len(data['cards'])} 未解析={len(unanalyzed)} "
-          f"cost=${meta['cost_usd']} elapsed={data['meta']['elapsed_s']}s")
+          f"elapsed={data['meta']['elapsed_s']}s")
 
 
 if __name__ == "__main__":
