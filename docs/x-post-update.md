@@ -1,10 +1,20 @@
 # X投稿(アップデート告知・2026-08-26)
 
-添付画像(この順番で):
-1. `docs/images/16-whats-new.png` — 更新内容の要約(1枚で全体が分かる)
-2. `docs/images/09-risk-colors.png` — 危険度の色分け(赤・橙・青)
-3. `docs/images/13-progress-map.png` — 進み具合の色分け(どこまで見たか)
-4. `docs/images/12-split-screen.png` — 使い方の全体像(左=チャット / 右=翻訳)
+添付画像 — **言語ごとに別のセットを使うこと**(画面が日本語/英語で異なるため)
+
+日本語投稿用(`docs/images/`):
+1. `16-whats-new.png` — 更新内容の要約
+2. `09-risk-colors.png` — 危険度の色分け
+3. `13-progress-map.png` — 進み具合の色分け
+4. `12-split-screen.png` — 使い方の全体像
+
+英語投稿用(`docs/images/en/`):
+1. `en/16-whats-new.png` — 更新内容の要約(英語)
+2. `en/09-risk-colors.png` — 危険度の色分け(英語UI・英語コード)
+3. `en/13-progress-map.png` — 進み具合の色分け(英語)
+4. `en/12-split-screen.png` — 使い方の全体像(英語)
+
+英語版はUIだけでなく**デモアプリのコード内コメントも英語**のものを使用(英語圏の読者が読めるように)。
 
 ※ 画像はすべてリポジトリ同梱のデモ用アプリ。実案件のコードや未公開プロダクト名は写っていない。
 

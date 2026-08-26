@@ -1,0 +1,31 @@
+<meta charset="utf-8">
+<title>Code Interpreter — Home</title>
+<style>
+:root { --bg:#F7F8F7; --surface:#FFF; --ink:#242B2E; --muted:#67736F; --line:#E2E5E0;
+  --accent:#0E7C66; --crit-bg:#FBEAE8; --crit-fg:#791F1F; --warn-bg:#FBF3E1; --warn-fg:#633806; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#14181A; --surface:#1D2326; --ink:#E4E8E4; --muted:#96A29E; --line:#2C3538;
+  --accent:#3FB392; --crit-bg:#331E1C; --crit-fg:#E88B81; --warn-bg:#2E2718; --warn-fg:#E0B45E; } }
+:root[data-theme="dark"] { --bg:#14181A; --surface:#1D2326; --ink:#E4E8E4; --muted:#96A29E;
+  --line:#2C3538; --accent:#3FB392; --crit-bg:#331E1C; --crit-fg:#E88B81; --warn-bg:#2E2718; --warn-fg:#E0B45E; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; font-size:14px; line-height:1.8; }
+main { max-width:760px; margin:0 auto; padding:28px 20px 60px; }
+h1 { font-size:19px; margin:0 0 4px; }
+.sub { color:var(--muted); font-size:12.5px; margin-bottom:22px; }
+a.card { display:block; text-decoration:none; color:inherit; background:var(--surface);
+  border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-bottom:12px; }
+a.card:hover { border-color:var(--accent); }
+.name { font-weight:700; font-size:16px; }
+.meta { color:var(--muted); font-size:12.5px; margin-top:3px; }
+.tags { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+.tag { font-size:11.5px; padding:1px 10px; border-radius:999px; background:var(--warn-bg); color:var(--warn-fg); }
+.tag.red { background:var(--crit-bg); color:var(--crit-fg); font-weight:700; }
+.tag.plain { background:transparent; color:var(--muted); border:1px solid var(--line); }
+.how { background:var(--surface); border-left:3px solid var(--accent); border-radius:8px;
+  padding:12px 16px; margin-top:24px; font-size:13px; }
+.how b { color:var(--accent); }
+.how ol { margin:8px 0 0; padding-left:1.4em; }
+</style>
+<main><h1>📖 Code Interpreter</h1><div class="sub">Pick the project you want to read.</div><a class="card" href="#"><div class="name">Booking demo</div><div class="meta">Last translated: 08/26 20:45</div><div class="tags"><span class="tag red">🔴 7 serious</span><span class="tag plain">8 files / 27 units</span></div></a><a class="card" href="#"><div class="name">D200X (vibe-deck)</div><div class="meta">Last translated: 08/26 16:46</div><div class="tags"><span class="tag red">🔴 35 serious</span><span class="tag plain">34 files / 374 units</span></div></a><a class="card" href="#"><div class="name">Edge Planet</div><div class="meta">Last translated: 08/26 16:53</div><div class="tags"><span class="tag red">🔴 14 serious</span><span class="tag plain">24 files / 258 units</span></div></a><div class="how"><b>That is the whole workflow</b><ol><li>Pick a project above</li><li>Press <b>🔴 Risky parts only</b> for the essentials</li><li>Mark anything odd with <b>✗</b>, then press <b>📮 Send flags to the AI</b></li><li>Say “<b>fix the flagged items</b>” in chat and the AI fixes them</li></ol><div style="margin-top:10px;color:var(--muted);font-size:12.5px">To add another project, say “<b>show me the code for X</b>” in chat.</div></div></main>
