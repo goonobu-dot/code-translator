@@ -29,8 +29,21 @@ Three ways, same screen:
 | **B. Double-click** | Double-click the launcher file placed in your project folder on first run |
 | **C. Command line** | `code-translate <your-project> --open --lang en` |
 
-The first run generates the translation with AI (~2 minutes and ~$0.1–0.3 for a small app).
-**From the second time on, it opens instantly** — the translation is already there.
+### ⏳ There is a wait before the view opens (most important note)
+
+The tool **first has AI read and translate the whole codebase, then opens the view**.
+Nothing appears instantly — you wait for the translation to finish.
+
+| Size of the codebase | Typical wait | Typical cost |
+|---|---|---|
+| Small app (3 files, ~150 lines) | **~2 minutes** | ~$0.2–0.35 |
+| Medium app (23 files, ~2,800 lines) | **~5 minutes** | ~$3.5 |
+
+- The page stays closed while it runs and opens automatically when done (chat reports time and cost)
+- You can keep asking for other work in chat while you wait
+- **From the second run on it opens instantly and costs nothing** unless the code changed; only changed parts are redone
+- Stopping midway breaks nothing — ask again and it resumes
+
 Use `--lang en` for English output; the UI follows the translation language automatically.
 
 ---
