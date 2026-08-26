@@ -1,0 +1,113 @@
+Major update to Code Interpreter — the tool that lets non-engineers read AI-written code in plain language.
+
+You read a plain-English explanation next to the real code, and answer "✓ looks right / ✗ wrong". That's the whole interaction. You never have to read code yourself.
+
+Here is everything that changed.
+
+──────────
+
+1. Risk-based color coding (image 2)
+
+When you vibe-code an app, every line looks equally important. It isn't. The places that move money, delete data, or send information outside — those are the ones you need to actually understand.
+
+So there are now four levels:
+
+🔴 Serious — sends data out, charges, deletes, personal data
+🟠 Check this — failure handling, outside components
+🔵 Good to know — minor notes
+none — ordinary code
+
+The AI classifies by category × severity, but sending data out, charging/deleting, and personal data get promoted to red even at medium severity — that's what non-engineers most need to see.
+
+Press "🔴 Risky parts only" and a real project narrows from 374 units to 45. One eighth of the reading, all of the risk.
+
+Real examples the AI produced on a demo app:
+
+・"It charges the card first, then saves the record. If saving fails, the customer is charged with no record of it."
+・"No confirmation or backup before deletion. A 'cancelled' flag is the usual design instead of deleting."
+
+It doesn't just translate — it names the risk and suggests the fix.
+
+──────────
+
+2. Your review now accumulates (image 3)
+
+Before, changing a single character wiped every "✓ reviewed" mark. Review could never finish. That was a real design flaw.
+
+Now:
+・untouched units keep their ✓
+・only changed units return to "🔄 Re-check"
+・"▶ Continue" shows only what you haven't answered yet
+
+And a strip of small squares sits at the top — one square per file: green = reviewed, amber = partial, grey = untouched, red outline = contains something serious. Click one to open that file. You see how far you got before you even pick a file.
+
+Reading ten units and stopping is now a perfectly normal thing to do.
+
+──────────
+
+3. Translation got much faster
+
+Only changed files are re-translated.
+
+・A 2,800-line project: ~9 minutes → a few dozen seconds (one changed file)
+・AI calls: 35 → 1
+
+This isn't more processing — it's the removal of waste that was there all along. "Read it often" finally became practical.
+
+──────────
+
+4. One way in (home screen)
+
+Press ctrl + ] and you get a list of every translated project, each showing "🔴 N serious" and its size, so you can choose what deserves attention.
+
+One phrase to remember: "show me the code for X." No modes, no flags, no commands.
+
+──────────
+
+5. Readability fixes, thoroughly
+
+・Not a single line is skipped — lines caught between explanation boundaries (closing braces and such) used to vanish from the page. I found 71 missing lines and fixed it
+・The explanation stays beside the code — in long units, the plain-language text no longer scrolls away
+・Long lines wrap — nothing is hidden behind horizontal scroll any more
+・The page never swaps under you while reading — a new translation only announces itself; you switch when you're ready
+
+──────────
+
+Also in this release
+
+・📮 Send flags to the AI — mark ✗ or write a comment, press one button, then say "fix the flagged items" in chat
+・▶ Read in order — walks you through the code as a story ("the app starts → you build your companion → life in the garden begins"). The best entry point for a codebase you've never seen
+・Learning mode — hides the explanation so you can guess first, then reveal
+・Japanese and English — --lang en produces English explanations and an English UI
+・Deep links — a link in chat jumps straight to that spot in the translated view and highlights it
+
+──────────
+
+How I actually use it (image 4)
+
+Claude Code split in half — chat on the left, the translated code on the right.
+
+Ask on the left → read the pairing on the right → mark anything odd with ✗ → press "📮 Send flags to the AI" → the AI fixes it back in the chat. One window, no switching.
+
+──────────
+
+Now the honest part — the problem I have not solved.
+
+The translation works. The colors work. But then you read:
+
+"Sends the player ID, address and partner name to a server."
+
+And if you are not an engineer, you still cannot tell whether that is fine or not. You know the fact. You don't know the decision.
+
+Making the AI declare "this is safe / this is dangerous" would be easy, and I think it would be wrong. One bad call destroys the trust — and more importantly, the framing itself steers the human's decision. The moment the builder decides "this is the best way to present it", half the conclusion is already made.
+
+So I deliberately left it unbuilt, until I can observe where real users hesitate and what they actually decide on.
+
+If you have an idea for how to present this so a non-engineer can genuinely decide, I would love to hear it. Solve that, and this tool becomes something that really matters.
+
+MIT licensed. Translation runs inside your existing Claude Code plan — no extra charge.
+
+GitHub: https://github.com/goonobu-dot/code-translator
+Manual (5 min, with screenshots): https://github.com/goonobu-dot/code-translator/blob/main/docs/manual.en.md
+
+#vibecoding #ClaudeCode #buildinpublic
