@@ -49,7 +49,12 @@
   .filehead { font-size:13px; font-weight:700; margin:16px 0 6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .filehead .role { font-weight:400; color:var(--muted); font-size:12px; }
   .achip { font-size:10px; font-weight:400; background:var(--soft); color:var(--muted); padding:0 7px; border-radius:999px; }
-  .pairsfile { border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:20px; background:var(--surface); }
+  /* overflow:hidden は説明の追従(sticky)を壊すので使わない。角丸は端のセルに直接かける */
+  .pairsfile { border:1px solid var(--line); border-radius:12px; margin-bottom:20px; background:var(--surface); }
+  .pairsfile .sec:first-child .sec-l { border-top-left-radius:11px; }
+  .pairsfile .sec:first-child .sec-r { border-top-right-radius:11px; }
+  .pairsfile .sec:last-child .sec-l { border-bottom-left-radius:11px; }
+  .pairsfile .sec:last-child .sec-r { border-bottom-right-radius:11px; }
   .sec { display:grid; grid-template-columns:minmax(0,26rem) minmax(0,1fr); }
   .sec + .sec .sec-l { border-top:1px solid var(--line); }
   .sec:hover .sec-r { background:#262E34; }
@@ -57,7 +62,9 @@
   .sec.imp .sec-l { box-shadow:inset 3px 0 0 var(--warn-fg); }
   .sec.done-ok .sec-l { box-shadow:inset 3px 0 0 var(--ok-fg); }
   .sec.done-ng .sec-l { box-shadow:inset 3px 0 0 var(--crit-fg); }
-  .sec-l { padding:9px 14px 9px; display:flex; flex-direction:column; }
+  .sec-l { padding:9px 14px 9px; }
+  /* 長いまとまりでも説明がコードに寄り添って留まる(読んでいる場所と説明がずれない) */
+  .lwrap { position:sticky; top:44px; display:flex; flex-direction:column; }
   .sec-h { font-weight:700; font-size:13.5px; line-height:1.6; margin-bottom:2px; display:flex; align-items:baseline; gap:8px; }
   .sec-h .sec-a { margin:0 0 0 auto; font-weight:400; }
   .crumb { font-size:10.5px; color:var(--muted); font-family:Menlo,monospace; margin-bottom:3px; }
@@ -67,8 +74,10 @@
   .sec-warn { font-size:12px; color:var(--warn-fg); background:var(--warn-bg); border-radius:6px; padding:4px 10px; margin-top:6px; line-height:1.65; }
   .sec-a { font-size:10.5px; color:var(--muted); font-family:Menlo,monospace; }
   .sec-r { background:#1F2428; color:#D6DEE3; padding:8px 0; overflow-x:auto; font-family:Menlo,monospace; font-size:12px; line-height:1.75; }
-  .ln { display:flex; padding:0 14px; white-space:pre; }
+  /* 長い行も隠さず折り返す(横スクロールしないと読めない状態を作らない) */
+  .ln { display:flex; padding:0 14px; }
   .ln .no { width:32px; color:#5C666D; flex-shrink:0; user-select:none; }
+  .ln .src { white-space:pre-wrap; overflow-wrap:anywhere; text-indent:-2em; padding-left:2em; }
   .kw { border-bottom:1px dotted #7BA8C4; cursor:help; }
   .c-com { color:#8A99A3; } .c-str { color:#E8B36A; } .c-key { color:#8FBFE8; }
   .ref { border-bottom:1px dashed #6BC5A8; cursor:pointer; }
@@ -89,7 +98,7 @@
   #storybar .nx { border-color:var(--accent); color:var(--accent); }
   body.storying .warp { display:none; }
   body.storying main { padding-bottom:160px; }
-  .ctrl { margin-top:auto; padding-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; opacity:.55; transition:opacity .15s; }
+  .ctrl { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; opacity:.55; transition:opacity .15s; }
   .sec:hover .ctrl, .sec:focus-within .ctrl { opacity:1; }
   .ctrl button { font-family:inherit; font-size:11.5px; padding:2px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); cursor:pointer; }
   .ctrl .ok:hover { border-color:var(--ok-fg); color:var(--ok-fg); }
@@ -441,13 +450,23 @@ function render() {
     if (activeFile !== "__all__" && f.path !== activeFile) continue;
     const fsecs = secs.filter(s => s.file === f.path);
     if (!fsecs.length) continue;
+    // 表示範囲の保証: 説明の切れ目で行が消えないよう、各まとまりの表示を次のまとまりの直前まで伸ばす
+    // (閉じ括弧や空行は直前のまとまりに付く)。これでファイルの全行が必ず1度だけ画面に出る。
+    const starts = fsecs.map(s => parseLines(s.lines)[0] || 1);
+    const spans = fsecs.map((s, i) => {
+      const a = i === 0 ? 1 : starts[i];
+      const b = (i === fsecs.length - 1) ? f.lines.length : Math.max(a, starts[i + 1] - 1);
+      return { a, b };
+    });
     const ltMap = {};
     d.line_translations.filter(t => t.file === f.path).forEach(t => ltMap[t.line] = t);
     h += `<div class="filehead">${esc(f.path)}<span class="role">${f.role ? "— " + esc(f.role) : ""}</span>${f.author ? `<span class="achip">${L.author}: ${esc(f.author)}</span>` : ""}</div><div class="pairsfile">`;
-    for (const s of fsecs) {
+    fsecs.forEach((s, si) => {
       const k = secKey(s), st = rv[k] || {};
       const ki = SECKEYS.push(k) - 1;
-      const lines = parseLines(s.lines);
+      const lines = [];
+      for (let n = spans[si].a; n <= Math.min(spans[si].b, f.lines.length); n++) lines.push(n);
+      if (!lines.length) lines.push(spans[si].a);
       const secCards = d.cards.filter(c => c.file === f.path && parseLines(c.lines).some(n => lines.includes(n)));
       const imp = secCards.length > 0;
       if (imp) impCount++;
@@ -456,12 +475,12 @@ function render() {
       for (const n of lines) {
         if (n > f.lines.length) break;
         const t = ltMap[n];
-        code += `<div class="ln"${t ? ` title="${esc(t.translation)}"` : ""}><span class="no">${n}</span><span>${hlLine(f.lines[n - 1] || "", f.path, n)}</span></div>`;
+        code += `<div class="ln"${t ? ` title="${esc(t.translation)}"` : ""}><span class="no">${n}</span><span class="src">${hlLine(f.lines[n - 1] || "", f.path, n)}</span></div>`;
       }
       const border = st.v === "ok" ? " done-ok" : (st.v === "ng" || st.v === "uk") ? " done-ng" : "";
       SECMETA[ki] = { file: f.path, a: lines[0], b: lines[lines.length - 1] };
       h += `<div class="sec${imp ? " imp" : ""}${border}${veiled ? " veiled" : ""}" id="s${ki}"${veiled ? ` onclick="revealSec(event,this)"` : ""}>
-        <div class="sec-l">
+        <div class="sec-l"><div class="lwrap">
           <div class="sec-h">${imp ? `<span class="impb">${L.caution}</span>` : ""}${esc(s.heading)}<span class="sec-a">${L.lines(esc(String(s.lines)))}</span></div>
           ${(() => {
             const ch = scopeChain(f, lines[0]);
@@ -479,9 +498,9 @@ function render() {
             : `<details class="cwrap" onclick="event.stopPropagation()"><summary>${L.cmtOpen}</summary>
                <textarea id="ta-${ki}" placeholder="${L.cmtPh}"></textarea>
                <button class="hbtn" onclick="saveComment(event,${ki})">${L.save}</button></details>`}
-        </div>
+        </div></div>
         <div class="sec-r">${code}</div></div>`;
-    }
+    });
     h += `</div>`;
   }
 
