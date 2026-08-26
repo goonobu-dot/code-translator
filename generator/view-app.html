@@ -37,6 +37,7 @@
   .filebar { display:flex; gap:5px; padding:8px 16px 0; flex-wrap:wrap; align-items:center; max-width:940px; margin:0 auto; }
   .filebar .lbl { font-size:11px; color:var(--muted); }
   .fbtn { font-family:Menlo,monospace; font-size:11.5px; padding:3px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
+  .fsel { font-family:Menlo,monospace; font-size:11.5px; padding:3px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; max-width:min(52ch, 70vw); }
   .fbtn.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
   .fbtn .fd { font-family:"Hiragino Kaku Gothic ProN",sans-serif; font-size:11px; margin-left:6px; }
   .fbtn .fd.ok { color:var(--ok-fg); } .fbtn.on .fd.ok { color:inherit; }
@@ -171,6 +172,7 @@ const UI = {
     flowLb: "何が起きるか(押すとそのコードへ)",
     storyBtn: "▶ 順番に読む", storyPrev: "← 前へ", storyNext: "次へ →", storyDone: "おわり",
     crumbIn: "の中",
+    filesLeft: (a, b) => `未確認 ${a} / ${b} ファイル`,
     guideShort: "使い方: 上のファイル名を押す → 説明を読む → ✓ / ✗ / ? を押す。✗とコメントはチャットで「たまった指摘を直して」と言えばAIが対応。",
     cmtOpen: "コメントを書く", cmtPh: "例: ここは確認画面を挟んでほしい", save: "保存",
     yourCmt: "あなたのコメント", edit: "編集",
@@ -201,6 +203,7 @@ const UI = {
     flowLb: "What happens (click to jump to the code)",
     storyBtn: "▶ Read in order", storyPrev: "← Back", storyNext: "Next →", storyDone: "Done",
     crumbIn: "— inside this",
+    filesLeft: (a, b) => `${a} of ${b} files left`,
     guideShort: 'How to: press a file name above → read each unit → press ✓ / ✗ / ?. ✗ answers and comments are fixed when you say "fix the flagged items" in chat.',
     cmtOpen: "Write a comment", cmtPh: "e.g. add a confirmation screen before sending", save: "Save",
     yourCmt: "Your comment", edit: "Edit",
@@ -401,13 +404,25 @@ function render() {
 
   SECKEYS = [];
   FILEKEYS = d.files.map(f => f.path);
+  const remOf = f => secs.filter(s => s.file === f.path && !(rv[secKey(s)] || {}).v).length;
   const fb = [`<span class="lbl">${L.pick}</span>`];
-  fb.push(`<button class="fbtn${activeFile === "__all__" ? " on" : ""}" onclick="setFile(-1)">${L.all}</button>`);
-  d.files.forEach((f, fi) => {
-    const fsecs = secs.filter(s => s.file === f.path);
-    const rem = fsecs.filter(s => !(rv[secKey(s)] || {}).v).length;
-    fb.push(`<button class="fbtn${activeFile === f.path ? " on" : ""}" onclick="setFile(${fi})">${esc(f.path)}<span class="fd ${rem ? "warn" : "ok"}">${rem ? L.fleft(rem) : "✓"}</span></button>`);
-  });
+  if (d.files.length > 6) {
+    // ファイルが多いときは1行の選択メニューにまとめる(ボタンの帯で画面を埋めない)
+    const opts = [`<option value="-1"${activeFile === "__all__" ? " selected" : ""}>${L.all}</option>`]
+      .concat(d.files.map((f, fi) => {
+        const rem = remOf(f);
+        return `<option value="${fi}"${activeFile === f.path ? " selected" : ""}>${esc(f.path)} ${rem ? "— " + L.fleft(rem) : "— ✓"}</option>`;
+      }));
+    fb.push(`<select class="fsel" onchange="setFile(parseInt(this.value))">${opts.join("")}</select>`);
+    const left = d.files.filter(f => remOf(f) > 0).length;
+    fb.push(`<span class="lbl">${L.filesLeft(left, d.files.length)}</span>`);
+  } else {
+    fb.push(`<button class="fbtn${activeFile === "__all__" ? " on" : ""}" onclick="setFile(-1)">${L.all}</button>`);
+    d.files.forEach((f, fi) => {
+      const rem = remOf(f);
+      fb.push(`<button class="fbtn${activeFile === f.path ? " on" : ""}" onclick="setFile(${fi})">${esc(f.path)}<span class="fd ${rem ? "warn" : "ok"}">${rem ? L.fleft(rem) : "✓"}</span></button>`);
+    });
+  }
   $("filebar").innerHTML = fb.join("");
 
   let h = "";
@@ -566,8 +581,29 @@ async function load(first) {
       if (!first) toast(L.toastUpd);
     }
   } catch {
-    if (first) $("main").innerHTML = `<p style="color:var(--crit-fg);padding:16px">${L.noData}</p>`;
+    if (first) $("main").innerHTML = emptyStateHtml();
   }
+}
+function emptyStateHtml() {
+  // 翻訳データが隣にない状態(ひな形を直接開いた等)。何が起きているかと次の一手を必ず示す。
+  const ja = !document.documentElement.lang || document.documentElement.lang === "ja";
+  return ja ? `<div class="summary" style="margin-top:12px">
+    <span class="lb">この画面について</span>
+    <p style="margin:6px 0 0">これは<b>コード通訳の画面のひな形</b>です。翻訳した中身がまだ入っていないため、コードも説明も表示されていません(不具合ではありません)。</p>
+    <p style="margin:8px 0 0">実際の翻訳を見るには、次のどれかをしてください。</p>
+    <ol style="margin:6px 0 0; padding-left:1.4em; line-height:1.9">
+      <li><b>チャットで「コードを翻訳して」と言う</b> — 翻訳が作られ、読める画面が自動で開きます</li>
+      <li>すでに翻訳済みなら <b>キーボードの ctrl と ] を同時に押す</b> — 最後に作られた翻訳ページが開きます</li>
+    </ol>
+  </div>` : `<div class="summary" style="margin-top:12px">
+    <span class="lb">About this screen</span>
+    <p style="margin:6px 0 0">This is the <b>empty template</b> of the Code Interpreter view. No translated content is attached yet, so nothing is shown (this is not a failure).</p>
+    <p style="margin:8px 0 0">To see a real translation:</p>
+    <ol style="margin:6px 0 0; padding-left:1.4em; line-height:1.9">
+      <li><b>Say "translate the code" in chat</b> — the readable view opens automatically when it is ready</li>
+      <li>If it is already translated, press <b>ctrl + ]</b> to reopen the latest translated page</li>
+    </ol>
+  </div>`;
 }
 let ctxTick = false;
 window.addEventListener("scroll", () => {
