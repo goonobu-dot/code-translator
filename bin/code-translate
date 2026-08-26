@@ -1,20 +1,26 @@
 #!/bin/bash
-# コード通訳: 翻訳の生成〜画面の表示までを1コマンドで行う。
-#   code-translate <対象フォルダ> --open   … 翻訳して、ブラウザで画面を開く(人間用)
-#   code-translate <対象フォルダ>          … 翻訳の更新のみ(フック・自動更新用)
-# --open 時は対象フォルダに「コード通訳を開く.command」(ダブルクリックで開くボタン)も設置する。
+# コード通訳: 翻訳を作り、読む画面(1枚もののHTML)を用意する。
+#
+#   code-translate <対象フォルダ>            … 翻訳して artifact.html を作る(既定)
+#   code-translate <対象フォルダ> --serve    … さらにローカル配信もする(URLを表示するだけ)
+#   code-translate <対象フォルダ> --browser  … 外部ブラウザで開く(明示したときだけ)
+#
+# 既定ではブラウザを開かない。Claude Code内のページで読む運用のため。
 set -euo pipefail
 SELF="$(readlink -f "$0")"
 ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
-TARGET="${1:?対象フォルダを指定してください (例: code-translate ~/my-app --open)}"
+TARGET="${1:?対象フォルダを指定してください (例: code-translate ~/my-app)}"
 shift || true
 TARGET="$(cd "$TARGET" && pwd)"
 PORT=8931
-OPEN=0
+SERVE=0
+BROWSER=0
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --open) OPEN=1 ;;
+    --serve) SERVE=1 ;;
+    --browser) SERVE=1; BROWSER=1 ;;
+    --open) SERVE=1 ;;   # 旧称。ブラウザは開かない(明示するには --browser)
     --port) PORT="$2"; shift ;;
     *) ARGS+=("$1") ;;
   esac
@@ -31,7 +37,11 @@ python3 "$ROOT/analyzer/analyze.py" "$TARGET" ${ARGS[@]+"${ARGS[@]}"}
 mkdir -p "$VIEW"
 cp "$ROOT/generator/view-app.html" "$VIEW/index.html"
 
-if [ "$OPEN" = 1 ]; then
+# 読む画面(1枚で完結するHTML)を作る。これをClaude Codeのページとして開く
+python3 "$ROOT/generator/build_artifact.py" "$TARGET" >/dev/null
+echo "読む画面: $TARGET/.code-translate/artifact.html"
+
+if [ "$SERVE" = 1 ]; then
   # 既存サーバーが「このプロジェクト」を配信しているか確認し、違えば空きポートを使う(取り違え防止)
   FOUND=""
   for P in $(seq "$PORT" $((PORT + 9))); do
@@ -52,15 +62,7 @@ if [ "$OPEN" = 1 ]; then
     exit 1
   fi
   PORT="$FOUND"
-  # ダブルクリックで開ける「ボタン」を対象フォルダに設置(初回のみ)
-  BTN="$TARGET/コード通訳を開く.command"
-  if [ ! -f "$BTN" ]; then
-    printf '#!/bin/bash\n"%s" "%s" --open\n' "$SELF" "$TARGET" > "$BTN"
-    chmod +x "$BTN"
-    echo "設置: $BTN (次からはこれをダブルクリックするだけで開けます)"
-  fi
-  open "http://localhost:$PORT"
-  echo "画面: http://localhost:$PORT"
-else
-  echo "ビュー更新: $VIEW/index.html"
+  echo "配信中: http://localhost:$PORT"
+  # ブラウザを開くのは、明示的に頼まれたときだけ
+  [ "$BROWSER" = 1 ] && open "http://localhost:$PORT"
 fi

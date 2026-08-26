@@ -26,17 +26,23 @@ mkdir -p ~/.local/bin && ln -sf "$PWD/bin/code-translate" ~/.local/bin/code-tran
 # ~/.local/bin がPATHにない場合は次の1行も実行(command not found になるとき)
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 
-# 3. 翻訳して開く(ブラウザが自動で開きます)
-code-translate ~/あなたのアプリのフォルダ --open
+# 3. 翻訳する
+code-translate ~/あなたのアプリのフォルダ
 ```
 
-英語で使う場合(English output + English UI): `code-translate <project> --open --lang en`
+これで `<対象>/.code-translate/artifact.html` ができます。**1枚で完結するHTML**なので、
+そのまま開いても、誰かに渡しても読めます。**ブラウザは勝手に開きません。**
 
-初回実行時、対象フォルダに **「コード通訳を開く.command」** が置かれます。
-**次からはこのファイルをダブルクリックするだけ**で画面が開きます。
+| 使い方 | コマンド |
+|---|---|
+| 翻訳して読む画面を作る(既定) | `code-translate <project>` |
+| ローカル配信もする(URLを表示) | `code-translate <project> --serve` |
+| 外部ブラウザでも開く | `code-translate <project> --browser` |
+| 英語で読む | `code-translate <project> --lang en` |
 
 Claude Codeを使っている場合は、`skill/` を `~/.claude/skills/code-translate/` に
-コピーすると、チャットで「**コードを翻訳して**」と言うだけで動きます。
+コピーすると、チャットで「**◯◯のコードを見せて**」と言うだけで動きます
+(翻訳が終わると、Claude Code内で開けるページのリンクが渡されます)。
 
 ## 画面でできること
 
