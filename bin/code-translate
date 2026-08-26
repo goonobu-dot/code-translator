@@ -37,9 +37,18 @@ python3 "$ROOT/analyzer/analyze.py" "$TARGET" ${ARGS[@]+"${ARGS[@]}"}
 mkdir -p "$VIEW"
 cp "$ROOT/generator/view-app.html" "$VIEW/index.html"
 
-# 読む画面(1枚で完結するHTML)を作る。これをClaude Codeのページとして開く
+# 読む画面(1枚で完結するHTML)を作る
 python3 "$ROOT/generator/build_artifact.py" "$TARGET" >/dev/null
-echo "読む画面: $TARGET/.code-translate/artifact.html"
+ART="$TARGET/.code-translate/artifact.html"
+echo ""
+echo "読む画面ができました:"
+echo "  $ART"
+echo ""
+echo "開き方(どれでも同じ画面です):"
+echo "  ・Finderでダブルクリック          open \"$ART\""
+echo "  ・Claude Codeを使っている場合      チャットで「コードを見せて」と言うとページのリンクが渡されます"
+echo "  ・ブラウザで開いてほしい場合        code-translate <対象> --browser"
+echo ""
 
 if [ "$SERVE" = 1 ]; then
   # 既存サーバーが「このプロジェクト」を配信しているか確認し、違えば空きポートを使う(取り違え防止)
